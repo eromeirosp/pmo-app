@@ -98,17 +98,17 @@ export default function NewProjectForm() {
                     </Link>
                 </div>
 
-                <Card className="border-emerald-100 shadow-sm">
-                    <CardHeader className="bg-emerald-50/50 border-b border-emerald-100 pb-8">
-                        <CardTitle className="text-2xl text-emerald-950 flex items-center gap-2">
-                            <Sparkles className="h-6 w-6 text-emerald-500" />
+                <Card className="border-slate-200/60 bg-white/50 backdrop-blur-sm shadow-sm shadow-slate-200/10">
+                    <CardHeader className="bg-emerald-50/40 border-b border-slate-100 pb-8 rounded-t-xl">
+                        <CardTitle className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+                            <Sparkles className="h-6 w-6 text-emerald-600" />
                             As 7 Perguntas Fundamentais
                         </CardTitle>
-                        <CardDescription className="text-emerald-800/80 text-base mt-2">
+                        <CardDescription className="text-slate-600 text-base mt-2">
                             Preencha os dados abaixo. Nossa IA Master estruturará o Business Case, Escopo e Riscos Iniciais automaticamente com base nas suas respostas.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="pt-8">
+                    <CardContent className="pt-8 bg-white/40">
                         <form onSubmit={handleSubmit} className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
@@ -148,7 +148,7 @@ export default function NewProjectForm() {
                             </div>
 
                             <div className="pt-6 border-t border-slate-100 flex justify-end">
-                                <Button type="submit" size="lg" disabled={loading} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white shadow-md">
+                                <Button type="submit" size="lg" disabled={loading} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 transition-all">
                                     {loading ? (
                                         <>
                                             <Loader2 className="mr-2 h-5 w-5 animate-spin" />

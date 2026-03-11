@@ -114,19 +114,19 @@ export default function DocumentCenter() {
                     <div className="w-full lg:w-64 flex flex-col gap-2">
                         <Button
                             variant={activeTab === "BUSINESS_CASE" ? "default" : "outline"}
-                            className={`justify-start ${activeTab === "BUSINESS_CASE" ? 'bg-emerald-600' : ''}`}
+                            className={`justify-start transition-all ${activeTab === "BUSINESS_CASE" ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20' : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200/60 shadow-sm'}`}
                             onClick={() => { setActiveTab("BUSINESS_CASE"); setEditingContent(null); }}>
                             Business Case (História)
                         </Button>
                         <Button
                             variant={activeTab === "ESCOPO_PRELIMINAR" ? "default" : "outline"}
-                            className={`justify-start ${activeTab === "ESCOPO_PRELIMINAR" ? 'bg-emerald-600' : ''}`}
+                            className={`justify-start transition-all ${activeTab === "ESCOPO_PRELIMINAR" ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20' : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200/60 shadow-sm'}`}
                             onClick={() => { setActiveTab("ESCOPO_PRELIMINAR"); setEditingContent(null); }}>
                             Escopo Preliminar
                         </Button>
                         <Button
                             variant={activeTab === "RISCOS_INICIAIS" ? "default" : "outline"}
-                            className={`justify-start ${activeTab === "RISCOS_INICIAIS" ? 'bg-emerald-600' : ''}`}
+                            className={`justify-start transition-all ${activeTab === "RISCOS_INICIAIS" ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20' : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200/60 shadow-sm'}`}
                             onClick={() => { setActiveTab("RISCOS_INICIAIS"); setEditingContent(null); }}>
                             Riscos & Ameaças
                         </Button>
@@ -134,32 +134,32 @@ export default function DocumentCenter() {
 
                     {/* Content Area */}
                     <div className="flex-1">
-                        <Card className="min-h-[500px] border-emerald-100 shadow-sm">
-                            <CardHeader className="flex flex-row items-center justify-between border-b border-emerald-50 bg-white pb-4">
-                                <CardTitle className="text-xl text-slate-800">
+                        <Card className="min-h-[500px] border-slate-200/60 bg-white/50 backdrop-blur-sm shadow-sm shadow-slate-200/10">
+                            <CardHeader className="flex flex-col xl:flex-row items-start xl:items-center justify-between border-b border-slate-100 bg-white/60 pb-4 gap-4">
+                                <CardTitle className="text-xl font-bold tracking-tight text-slate-900">
                                     {activeTab.replace("_", " ")}
                                 </CardTitle>
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2 w-full xl:w-auto">
                                     {editingContent !== null ? (
                                         <>
                                             <Button variant="ghost" size="sm" onClick={() => setEditingContent(null)}>Cancelar</Button>
-                                            <Button size="sm" onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+                                            <Button size="sm" onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all">
                                                 <Save className="h-4 w-4 mr-2" /> Salvar
                                             </Button>
                                         </>
                                     ) : (
                                         <>
-                                            <Button variant="outline" size="sm" className="text-amber-600 hover:text-amber-700 hover:bg-amber-50" onClick={() => toast.info('Funcionalidade de Rollback será exibida no Histórico')}>
+                                            <Button variant="outline" size="sm" className="bg-white text-slate-600 hover:text-amber-700 hover:bg-amber-50 border-slate-200/60 shadow-sm transition-all" onClick={() => toast.info('Funcionalidade de Rollback será exibida no Histórico')}>
                                                 <History className="h-4 w-4 mr-2" /> Rollback
                                             </Button>
-                                            <Button variant="outline" size="sm" onClick={handleEdit} className="text-emerald-700 hover:bg-emerald-50 border-emerald-200">
+                                            <Button variant="outline" size="sm" onClick={handleEdit} className="bg-white text-emerald-700 hover:bg-emerald-50 border-emerald-200/60 shadow-sm transition-all">
                                                 <Edit3 className="h-4 w-4 mr-2" /> Editar Documento
                                             </Button>
                                         </>
                                     )}
                                 </div>
                             </CardHeader>
-                            <CardContent className="p-6 bg-white/50">
+                            <CardContent className="p-6">
                                 {editingContent !== null ? (
                                     <Textarea
                                         value={editingContent}

@@ -39,10 +39,20 @@ export async function POST(req: NextRequest) {
       Retorne apenas o JSON, sem marcações markdown ou texto antes/depois.
     `;
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-        });
+        let response;
+        try {
+            response = await ai.models.generateContent({
+                model: 'gemini-3.1-pro',
+                contents: prompt,
+            });
+        } catch (apiError: any) {
+            console.warn('Fallback triggered: gemini-3.1-pro failed.', apiError.message || apiError);
+            // Attempt fallback with gemini-2.5-pro
+            response = await ai.models.generateContent({
+                model: 'gemini-2.5-pro',
+                contents: prompt,
+            });
+        }
 
         let rawText = response.text || "{}";
 
