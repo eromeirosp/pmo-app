@@ -2,13 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Topbar } from "@/components/layout/Topbar";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sparkles, Loader2, ArrowLeft } from "lucide-react";
+import { Sparkles, Info, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -25,7 +19,7 @@ export default function NewProjectForm() {
         impacts: ""
     });
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
@@ -41,7 +35,6 @@ export default function NewProjectForm() {
         toast.info("A IA está analisando seu projeto... isso pode levar alguns segundos.");
 
         try {
-            // 1. Send data to AI route to get the automated artifacts
             const aiResponse = await fetch("/api/ai", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -54,7 +47,6 @@ export default function NewProjectForm() {
 
             const aiResult = await aiResponse.json();
 
-            // 2. Combine Form Data with AI Result and save the project
             const finalProjectPayload = {
                 ...formData,
                 classification: aiResult.classification,
@@ -78,94 +70,159 @@ export default function NewProjectForm() {
             toast.success("Projeto criado com sucesso!");
             router.push(`/projects/${projectData.id}/documents`);
 
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            toast.error(error.message || "Ocorreu um erro inesperado.");
+            const err = error as Error;
+            toast.error(err.message || "Ocorreu um erro inesperado.");
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="flex min-h-screen flex-col bg-slate-50">
-            <Topbar title="Abertura de Projeto" />
-
-            <main className="flex-1 container mx-auto px-4 md:px-6 py-8 max-w-3xl">
-                <div className="mb-6">
-                    <Link href="/" className="inline-flex items-center text-sm font-medium text-emerald-600 hover:text-emerald-700 transition-colors">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Voltar ao Portfólio
-                    </Link>
+        <div className="flex min-h-screen w-full items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto py-10">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-300">
+                {/* Modal Header */}
+                <div className="bg-violet-600 p-6 text-white flex items-center gap-3">
+                    <Sparkles className="w-8 h-8" />
+                    <h2 className="text-xl font-bold">Criar Novo Projeto com IA</h2>
                 </div>
+                
+                <form onSubmit={handleSubmit}>
+                    <div className="p-6 space-y-6">
+                        {/* Info Box */}
+                        <div className="bg-violet-600/5 border border-violet-600/30 rounded-lg p-4 flex items-start gap-4">
+                            <Info className="w-6 h-6 text-violet-600 shrink-0" />
+                            <div>
+                                <p className="font-bold text-violet-600">Preenchimento Inteligente</p>
+                                <p className="text-sm text-slate-600 dark:text-slate-400">A IA analisará as informações fornecidas para sugerir cronogramas, recursos e riscos potenciais.</p>
+                            </div>
+                        </div>
 
-                <Card className="border-slate-200/60 bg-white/50 backdrop-blur-sm shadow-sm shadow-slate-200/10">
-                    <CardHeader className="bg-emerald-50/40 border-b border-slate-100 pb-8 rounded-t-xl">
-                        <CardTitle className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-                            <Sparkles className="h-6 w-6 text-emerald-600" />
-                            As 7 Perguntas Fundamentais
-                        </CardTitle>
-                        <CardDescription className="text-slate-600 text-base mt-2">
-                            Preencha os dados abaixo. Nossa IA Master estruturará o Business Case, Escopo e Riscos Iniciais automaticamente com base nas suas respostas.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-8 bg-white/40">
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">1. Nome do Projeto <span className="text-red-500">*</span></Label>
-                                    <Input id="name" name="name" value={formData.name} onChange={handleChange} placeholder="Ex: Migração Cloud V2" required />
+                        {/* Form Fields */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="col-span-full">
+                                <label className="block text-sm font-semibold mb-1 text-slate-700 dark:text-slate-300">Nome do Projeto <span className="text-rose-500">*</span></label>
+                                <input 
+                                    name="name"
+                                    value={formData.name}
+                                    onChange={handleChange}
+                                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-violet-600 focus:border-transparent outline-none px-4 py-2 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-all" 
+                                    placeholder="Ex: Expansão de Mercado 2024" 
+                                    type="text"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold mb-1 text-slate-700 dark:text-slate-300">Gerente do Projeto</label>
+                                <input 
+                                    name="manager"
+                                    value={formData.manager}
+                                    onChange={handleChange}
+                                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-violet-600 focus:border-transparent outline-none px-4 py-2 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-all" 
+                                    placeholder="Selecione o responsável" 
+                                    type="text"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold mb-1 text-slate-700 dark:text-slate-300">Orçamento (R$) <span className="text-rose-500">*</span></label>
+                                <input 
+                                    name="budget"
+                                    value={formData.budget}
+                                    onChange={handleChange}
+                                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-violet-600 focus:border-transparent outline-none px-4 py-2 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-all" 
+                                    placeholder="0,00" 
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-semibold mb-1 text-slate-700 dark:text-slate-300">Stakeholders Principais</label>
+                            <textarea 
+                                name="stakeholders"
+                                value={formData.stakeholders}
+                                onChange={handleChange}
+                                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-violet-600 focus:border-transparent outline-none px-4 py-2 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-all resize-y" 
+                                placeholder="Ex: Diretoria Financeira, Time de Marketing..." 
+                                rows={2}
+                            ></textarea>
+                        </div>
+
+                        {/* Context Section */}
+                        <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                            <h3 className="text-base font-bold mb-4 text-slate-900 dark:text-slate-100">Objetivos e Contexto</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-semibold mb-1 text-slate-700 dark:text-slate-300">Problemas a serem resolvidos <span className="text-rose-500">*</span></label>
+                                    <textarea 
+                                        name="problems"
+                                        value={formData.problems}
+                                        onChange={handleChange}
+                                        className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-violet-600 focus:border-transparent outline-none px-4 py-2 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-all resize-y" 
+                                        placeholder="Descreva os desafios atuais..." 
+                                        rows={2}
+                                        required
+                                    ></textarea>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="manager">2. Gerente do Projeto</Label>
-                                    <Input id="manager" name="manager" value={formData.manager} onChange={handleChange} placeholder="Ex: Ana Silva" />
+                                <div>
+                                    <label className="block text-sm font-semibold mb-1 text-slate-700 dark:text-slate-300">Benefícios Esperados</label>
+                                    <textarea 
+                                        name="returns"
+                                        value={formData.returns}
+                                        onChange={handleChange}
+                                        className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-violet-600 focus:border-transparent outline-none px-4 py-2 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-all resize-y" 
+                                        placeholder="O que o projeto deve alcançar?" 
+                                        rows={2}
+                                    ></textarea>
                                 </div>
                             </div>
+                        </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <Label htmlFor="budget">3. Orçamento Aprovado (R$) <span className="text-red-500">*</span></Label>
-                                    <Input id="budget" name="budget" type="number" min="0" step="0.01" value={formData.budget} onChange={handleChange} placeholder="Ex: 500000" required />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="stakeholders">4. Principais Stakeholders</Label>
-                                    <Input id="stakeholders" name="stakeholders" value={formData.stakeholders} onChange={handleChange} placeholder="Ex: CTO, Diretoria Financeira" />
-                                </div>
+                        {/* Additional Info */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="col-span-full">
+                                <label className="block text-sm font-semibold mb-1 text-slate-700 dark:text-slate-300">Impactos de Não Solução</label>
+                                <input 
+                                    name="impacts"
+                                    value={formData.impacts}
+                                    onChange={handleChange}
+                                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-violet-600 focus:border-transparent outline-none px-4 py-2 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-all" 
+                                    placeholder="Riscos se nada for feito" 
+                                    type="text"
+                                />
                             </div>
+                        </div>
+                    </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="problems">5. Que problemas o projeto resolverá? <span className="text-red-500">*</span></Label>
-                                <Textarea id="problems" name="problems" value={formData.problems} onChange={handleChange} placeholder="Descreva os gargalos ou dores atuais..." className="min-h-24 resize-y" required />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="returns">6. Retornos Esperados (ROI/Valor)</Label>
-                                <Textarea id="returns" name="returns" value={formData.returns} onChange={handleChange} placeholder="Ex: Redução de custo em 20%, aumento de receita..." className="min-h-24 resize-y" />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="impacts">7. Impactos (O que muda ou para quem muda?)</Label>
-                                <Textarea id="impacts" name="impacts" value={formData.impacts} onChange={handleChange} placeholder="Ex: Automação completa do setor fiscal..." className="min-h-24 resize-y" />
-                            </div>
-
-                            <div className="pt-6 border-t border-slate-100 flex justify-end">
-                                <Button type="submit" size="lg" disabled={loading} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 transition-all">
-                                    {loading ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                            Analisando e Gerando...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Sparkles className="mr-2 h-5 w-5" />
-                                            Gerar Projeto com IA
-                                        </>
-                                    )}
-                                </Button>
-                            </div>
-                        </form>
-                    </CardContent>
-                </Card>
-            </main>
+                    {/* Footer Buttons */}
+                    <div className="p-6 bg-slate-50 dark:bg-slate-800/50 flex flex-col sm:flex-row-reverse gap-3 rounded-b-xl border-t border-slate-200 dark:border-slate-800">
+                        <button 
+                            type="submit" 
+                            disabled={loading}
+                            className="bg-slate-900 dark:bg-primary text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed min-w-[200px]"
+                        >
+                            {loading ? (
+                                <>
+                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                    Processando...
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles className="w-5 h-5" />
+                                    Criar Projeto com IA
+                                </>
+                            )}
+                        </button>
+                        <Link href="/" className="bg-transparent text-slate-600 dark:text-slate-400 font-semibold py-3 px-6 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-center border border-transparent">
+                            Cancelar
+                        </Link>
+                    </div>
+                </form>
+            </div>
         </div>
     );
 }

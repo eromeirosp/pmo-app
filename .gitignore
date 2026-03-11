@@ -44,3 +44,6 @@ next-env.d.ts
 
 # roadmap interno (nao subir para o github)
 ROADMAP.md
+
+# Agents and local skills (generated)
+.agents/

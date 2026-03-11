@@ -39,8 +39,9 @@ export async function PUT(req: NextRequest) {
 
         return NextResponse.json(updatedArtifact, { status: 200 });
 
-    } catch (error: any) {
-        console.error("Error updating artifact:", error);
+    } catch (error) {
+        const err = error as Error;
+        console.error("Error updating artifact:", err);
         return NextResponse.json({ error: "Erro ao atualizar o documento" }, { status: 500 });
     }
 }

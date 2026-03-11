@@ -45,8 +45,9 @@ export async function POST(req: NextRequest) {
                 model: 'gemini-3.1-pro',
                 contents: prompt,
             });
-        } catch (apiError: any) {
-            console.warn('Fallback triggered: gemini-3.1-pro failed.', apiError.message || apiError);
+        } catch (apiError) {
+            const err = apiError as Error;
+            console.warn('Fallback triggered: gemini-3.1-pro failed.', err.message || err);
             // Attempt fallback with gemini-2.5-pro
             response = await ai.models.generateContent({
                 model: 'gemini-2.5-pro',
@@ -63,13 +64,14 @@ export async function POST(req: NextRequest) {
         try {
             result = JSON.parse(rawText);
         } catch (parseError) {
-            console.error("Failed to parse Gemini response", rawText);
+            console.error("Failed to parse Gemini response", rawText, parseError);
             return NextResponse.json({ error: 'Erro ao formatar resposta da IA.' }, { status: 500 });
         }
 
         return NextResponse.json(result);
-    } catch (error: any) {
-        console.error('Error generating AI content:', error);
-        return NextResponse.json({ error: error.message || 'Erro interno no servidor' }, { status: 500 });
+    } catch (error) {
+            const err = error as Error;
+        console.error('Error generating AI content:', err);
+        return NextResponse.json({ error: err.message || 'Erro interno no servidor' }, { status: 500 });
     }
 }
