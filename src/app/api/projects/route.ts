@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
                         impact: parseInt(risk.impact),
                         category: risk.category || "Geral",
                         mitigation: risk.mitigation || null,
-                        status: "IDENTIFIED",
+                        status: "Identificado",
                     })),
                 },
             },

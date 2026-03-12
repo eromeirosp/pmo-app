@@ -7,7 +7,7 @@ import {
   ArrowRight,
   Info
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, parseLocalDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { TabHeader } from "./TabHeader";
 
@@ -41,8 +41,8 @@ export function ProjectInfoTab({ project, saveTrigger }: ProjectInfoTabProps) {
     classification: project.classification || "TRADITIONAL",
     status: project.status || "ACTIVE",
     budget: project.budget?.toString() || "",
-    startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : "2025-10-01",
-    endDate: project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : "2026-06-30",
+    startDate: project.startDate ? parseLocalDate(project.startDate).toISOString().split('T')[0] : "2025-10-01",
+    endDate: project.endDate ? parseLocalDate(project.endDate).toISOString().split('T')[0] : "2026-06-30",
   });
 
   const [formData, setFormData] = useState(getInitialData());

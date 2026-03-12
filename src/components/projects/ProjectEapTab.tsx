@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Download, Plus, Trash2, Network, Loader2, ChevronUp, ChevronDown } from 'lucide-react';
 import { TabHeader } from "./TabHeader";
 import { toast } from 'sonner';
+import { parseLocalDate } from "@/lib/utils";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -130,7 +131,7 @@ export default function ProjectEapTab({ projectId }: { projectId: string }) {
         item.name,
         item.description || "—",
         item.status === 'PENDING' ? 'Pendente' : item.status === 'IN_PROGRESS' ? 'Em Progresso' : 'Concluído',
-        new Date(item.createdAt).toLocaleDateString('pt-BR')
+        parseLocalDate(item.createdAt).toLocaleDateString('pt-BR')
       ]);
 
       autoTable(doc, {

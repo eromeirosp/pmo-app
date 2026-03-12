@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
     if (isListType) {
       responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "suggestions": ["item 1", "item 2", ...] }`;
     } else if (isRisk) {
-      responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "suggestions": [{ "title": "...", "description": "...", "probability": 3, "impact": 4, "category": "...", "mitigation": "..." }] }`;
+      responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "suggestions": [{ "title": "...", "description": "...", "probability": 3, "impact": 4, "category": "...", "mitigation": "...", "contingency": "..." }] }`;
     } else {
       responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "accomplishments": "...", "nextSteps": "...", "issues": "..." }`;
     }
