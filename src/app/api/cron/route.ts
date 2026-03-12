@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 // This endpoint can be triggered periodically (e.g., via Vercel Cron or a regular setInterval task runner).
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
     try {
         const now = new Date();
         // Threshold: 7 days inactive

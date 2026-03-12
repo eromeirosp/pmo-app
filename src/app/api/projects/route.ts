@@ -16,6 +16,9 @@ export async function POST(req: NextRequest) {
             classification,
             businessCase,
             preliminaryScope,
+            preliminaryTimeline,
+            milestones,
+            successCriteria,
             initialRisks,
         } = data;
 
@@ -38,6 +41,9 @@ export async function POST(req: NextRequest) {
                 problems,
                 returns,
                 impacts,
+                preliminaryTimeline,
+                milestones: milestones ? JSON.stringify(milestones) : null,
+                successCriteria: successCriteria ? JSON.stringify(successCriteria) : null,
                 status: 'GREEN',
                 artifacts: {
                     create: [
@@ -56,10 +62,12 @@ export async function POST(req: NextRequest) {
                     ],
                 },
                 risks: {
-                    create: (initialRisks || []).map((risk: any) => ({
+                    create: (initialRisks || []).map((risk: {description: string; probability: string; impact: string; category?: string; mitigation?: string}) => ({
                         description: risk.description,
                         probability: parseInt(risk.probability),
                         impact: parseInt(risk.impact),
+                        category: risk.category || "Geral",
+                        mitigation: risk.mitigation || null,
                         status: "IDENTIFIED",
                     })),
                 },
@@ -67,8 +75,9 @@ export async function POST(req: NextRequest) {
         });
 
         return NextResponse.json(project, { status: 201 });
-    } catch (error: any) {
-        console.error("Error saving project:", error);
+    } catch (error) {
+        const err = error as Error;
+        console.error("Error saving project:", err);
         return NextResponse.json({ error: "Erro ao salvar o projeto" }, { status: 500 });
     }
 }
@@ -85,13 +94,18 @@ export async function GET(req: NextRequest) {
                     mode: 'insensitive',
                 }
             },
+            include: {
+                eapItems: {
+                    select: { id: true, status: true }
+                }
+            },
             orderBy: {
                 createdAt: 'desc'
             }
         });
 
         return NextResponse.json(projects);
-    } catch (error) {
+    } catch (err) {
         return NextResponse.json({ error: "Erro ao buscar projetos" }, { status: 500 });
     }
 }
