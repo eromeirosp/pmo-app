@@ -18,7 +18,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-
 interface ProjectHeaderProps {
   project: {
     id: string;
@@ -26,9 +25,10 @@ interface ProjectHeaderProps {
     classification: string | null;
     status: string;
   };
+  onSave?: () => void;
 }
 
-export function ProjectHeader({ project }: ProjectHeaderProps) {
+export function ProjectHeader({ project, onSave }: ProjectHeaderProps) {
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const router = useRouter();
@@ -98,15 +98,9 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
             />
             <Button
               variant="outline"
-              className="hidden md:flex items-center gap-2 font-bold bg-secondary text-secondary-foreground border-none hover:bg-secondary/80"
-            >
-              <Upload className="h-4 w-4" />
-              Enviar arquivo
-            </Button>
-            <Button
-              variant="outline"
               size="icon"
               className="bg-secondary text-secondary-foreground border-none hover:bg-secondary/80"
+              onClick={() => window.print()}
             >
               <Printer className="h-4 w-4" />
             </Button>
@@ -141,6 +135,7 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
 
             <Button
               className="items-center gap-2 font-bold px-6 shadow-sm"
+              onClick={onSave}
             >
               <Save className="h-4 w-4" />
               Salvar

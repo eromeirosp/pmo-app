@@ -45,5 +45,10 @@ next-env.d.ts
 # roadmap interno (nao subir para o github)
 ROADMAP.md
 
+# debug and local scripts
+debug-*.ts
+scripts/
+prisma/seed-self.ts
+
 # Agents and local skills (generated)
 .agents/

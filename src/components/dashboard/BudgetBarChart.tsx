@@ -40,9 +40,9 @@ const CustomTooltip = ({
 }) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-slate-900 border border-white/10 rounded-lg shadow-2xl px-3 py-2 text-sm backdrop-blur-md">
-        <p className="font-semibold text-white max-w-[200px] truncate">{label}</p>
-        <p className="text-slate-400 mt-0.5">
+      <div className="bg-popover border border-border rounded-lg shadow-2xl px-3 py-2 text-sm">
+        <p className="font-semibold text-foreground max-w-[200px] truncate">{label}</p>
+        <p className="text-muted-foreground mt-0.5">
           {new Intl.NumberFormat("pt-BR", {
             style: "currency",
             currency: "BRL",

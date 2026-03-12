@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Calendar,
   ChevronDown,
@@ -28,10 +28,11 @@ function InputWrapper({ label, children, fullWidth = false }: { label: string; c
 
 interface ProjectInfoTabProps {
   project: any;
+  saveTrigger?: number;
 }
 
-export function ProjectInfoTab({ project }: ProjectInfoTabProps) {
-  const [formData, setFormData] = useState({
+export function ProjectInfoTab({ project, saveTrigger }: ProjectInfoTabProps) {
+  const getInitialData = () => ({
     name: project.name || "",
     description: project.description || "",
     manager: project.manager || "",
@@ -43,6 +44,8 @@ export function ProjectInfoTab({ project }: ProjectInfoTabProps) {
     startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : "2025-10-01",
     endDate: project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : "2026-06-30",
   });
+
+  const [formData, setFormData] = useState(getInitialData());
 
   const [loading, setLoading] = useState(false);
 
@@ -66,7 +69,16 @@ export function ProjectInfoTab({ project }: ProjectInfoTabProps) {
       setLoading(false);
     }
   };
+  const handleDiscard = () => {
+    setFormData(getInitialData());
+    toast.info("Alterações descartadas.");
+  };
 
+  useEffect(() => {
+    if (saveTrigger && saveTrigger > 0) {
+      handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+    }
+  }, [saveTrigger]);
 
   return (
     <div className="max-w-5xl mx-auto pb-24">
@@ -206,6 +218,7 @@ export function ProjectInfoTab({ project }: ProjectInfoTabProps) {
         <div className="px-8 py-6 border-t border-border bg-slate-50 dark:bg-slate-800/20 flex items-center justify-end gap-6">
           <button
             type="button"
+            onClick={handleDiscard}
             className="text-sm font-bold text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
           >
             Descartar

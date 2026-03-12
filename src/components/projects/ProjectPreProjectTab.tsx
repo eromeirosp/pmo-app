@@ -28,7 +28,8 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface ProjectPreProjectTabProps {
-  project: Project;
+  project: Project & { artifacts?: any[] };
+  saveTrigger?: number;
 }
 
 interface StakeholderRow {
@@ -49,7 +50,7 @@ interface ObjectiveRow {
 const inputCls = "w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 rounded-xl py-3 px-4 text-sm font-medium text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300";
 const selectCls = "appearance-none " + inputCls;
 
-export function ProjectPreProjectTab({ project }: ProjectPreProjectTabProps) {
+export function ProjectPreProjectTab({ project, saveTrigger }: ProjectPreProjectTabProps) {
   const [objectives, setObjectives] = useState<ObjectiveRow[]>([]);
   const [stakeholders, setStakeholders] = useState<StakeholderRow[]>([]);
   const [newStakeholder, setNewStakeholder] = useState({ name: "", role: "", email: "", interest: "Médio", influence: "Médio" });
@@ -60,6 +61,16 @@ export function ProjectPreProjectTab({ project }: ProjectPreProjectTabProps) {
   const [loadingSt, setLoadingSt] = useState(true);
   const [savingObj, setSavingObj] = useState(false);
   const [savingSt, setSavingSt] = useState(false);
+
+  const businessCase = project.artifacts?.find(a => a.type === "BUSINESS_CASE")?.content?.text || "";
+  const escopoPreliminar = project.artifacts?.find(a => a.type === "ESCOPO_PRELIMINAR")?.content?.text || "";
+
+  useEffect(() => {
+    if (saveTrigger && saveTrigger > 0) {
+      // In this tab, many fields save onBlur, but we can add a global toast or formal save if needed.
+      toast.success("Dados do Pré-Projeto salvos.");
+    }
+  }, [saveTrigger]);
 
   const baseUrl = `/api/projects/${project.id}`;
 
@@ -153,6 +164,20 @@ export function ProjectPreProjectTab({ project }: ProjectPreProjectTabProps) {
     }
   }, [baseUrl, editingStakeholder, editStForm]);
 
+  const updateProject = useCallback(async (field: string, value: string) => {
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(`${field === 'manager' ? 'Gerente' : 'Patrocinador'} atualizado.`);
+    } catch {
+      toast.error(`Erro ao atualizar ${field === 'manager' ? 'gerente' : 'patrocinador'}.`);
+    }
+  }, [project.id]);
+
   const getInitials = (name: string) =>
     name.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
 
@@ -181,11 +206,23 @@ export function ProjectPreProjectTab({ project }: ProjectPreProjectTabProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="flex flex-col gap-2">
               <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Gerente do Projeto *</label>
-              <input type="text" defaultValue={project.manager} className={inputCls} placeholder="Ex: Ana Beatriz" />
+              <input 
+                type="text" 
+                defaultValue={project.manager} 
+                onBlur={(e) => updateProject('manager', e.target.value)}
+                className={inputCls} 
+                placeholder="Ex: Ana Beatriz" 
+              />
             </div>
             <div className="flex flex-col gap-2">
               <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Patrocinador *</label>
-              <input type="text" className={inputCls} placeholder="Ex: Carlos Mendes" />
+              <input 
+                type="text" 
+                defaultValue={project.stakeholders || ""}
+                onBlur={(e) => updateProject('stakeholders', e.target.value)}
+                className={inputCls} 
+                placeholder="Ex: Carlos Mendes" 
+              />
             </div>
           </div>
         </div>
@@ -200,33 +237,31 @@ export function ProjectPreProjectTab({ project }: ProjectPreProjectTabProps) {
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-bold text-primary uppercase tracking-wider mb-1">Problema Atual</h3>
-                <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
-                  Processos manuais descentralizados, redundância de dados entre departamentos e falta de visibilidade em tempo real do estoque e fluxo de caixa.
+                <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-line">
+                  {project.problems || "Não informado."}
                 </p>
               </div>
               <div>
                 <h3 className="text-sm font-bold text-primary uppercase tracking-wider mb-1">Solução Proposta</h3>
-                <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
-                  Implementação de uma plataforma ERP integrada (módulos Financeiro, RH, Suprimentos e Vendas) com migração de dados em nuvem.
+                <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-line">
+                  {businessCase || "Não informada."}
                 </p>
               </div>
             </div>
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-bold text-primary uppercase tracking-wider mb-1">Benefícios Esperados</h3>
-                <ul className="list-disc list-inside text-slate-700 dark:text-slate-300 text-sm space-y-1">
-                  <li>Redução de 15% nos custos operacionais</li>
-                  <li>Aumento de 30% na velocidade de faturamento</li>
-                  <li>Unificação total da base de dados</li>
-                </ul>
+                <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-line">
+                  {project.returns || "Não informados."}
+                </p>
               </div>
               <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
                 <div className="flex justify-between items-center mb-1">
-                  <h3 className="text-sm font-bold text-primary">ROI Estimado</h3>
-                  <span className="text-primary font-black">18 Meses</span>
+                  <h3 className="text-sm font-bold text-primary">Budget Estimado</h3>
+                  <span className="text-primary font-black">R$ {project.budget.toLocaleString('pt-BR')}</span>
                 </div>
                 <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-2">
-                  <div className="bg-primary h-2 rounded-full w-3/4"></div>
+                  <div className="bg-primary h-2 rounded-full w-full"></div>
                 </div>
               </div>
             </div>
@@ -239,26 +274,9 @@ export function ProjectPreProjectTab({ project }: ProjectPreProjectTabProps) {
             <FileText className="text-primary h-6 w-6" />
             <h2 className="text-slate-900 dark:text-slate-100 text-xl font-bold">Escopo Preliminar</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-green-50 dark:bg-green-950/20 p-5 rounded-xl border border-green-100 dark:border-green-900/30">
-              <h3 className="flex items-center gap-2 text-green-700 dark:text-green-400 font-bold mb-3">
-                <CheckCircle2 className="h-5 w-5" /> Incluído
-              </h3>
-              <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
-                <li className="flex items-start gap-2"><span className="text-green-500">•</span> Mapeamento de processos AS-IS e TO-BE</li>
-                <li className="flex items-start gap-2"><span className="text-green-500">•</span> Customização de relatórios gerenciais</li>
-                <li className="flex items-start gap-2"><span className="text-green-500">•</span> Treinamento de 50 usuários-chave</li>
-              </ul>
-            </div>
-            <div className="bg-red-50 dark:bg-red-950/20 p-5 rounded-xl border border-red-100 dark:border-red-900/30">
-              <h3 className="flex items-center gap-2 text-red-700 dark:text-red-400 font-bold mb-3">
-                <XCircle className="h-5 w-5" /> Excluído
-              </h3>
-              <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
-                <li className="flex items-start gap-2"><span className="text-red-500">•</span> Renovação de infraestrutura de hardware local</li>
-                <li className="flex items-start gap-2"><span className="text-red-500">•</span> Implementação do módulo de CRM (Fase 2)</li>
-                <li className="flex items-start gap-2"><span className="text-red-500">•</span> Manutenção pós-implantação acima de 12 meses</li>
-              </ul>
+          <div className="bg-card dark:bg-slate-900/80 p-6 rounded-2xl border border-border dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:ring-1 dark:ring-white/5">
+            <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-line">
+              {escopoPreliminar || "O escopo preliminar ainda não foi definido para este projeto."}
             </div>
           </div>
         </div>

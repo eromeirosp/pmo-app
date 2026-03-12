@@ -24,9 +24,9 @@ interface ProjectCardProps {
 }
 
 const statusColorMap = {
-    GREEN: "bg-emerald-500/15 text-emerald-500 border-emerald-500/20",
-    YELLOW: "bg-amber-500/15 text-amber-500 border-amber-500/20",
-    RED: "bg-rose-500/15 text-rose-500 border-rose-500/20",
+    GREEN: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-400",
+    YELLOW: "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-500/20 dark:text-amber-400",
+    RED: "bg-rose-500/10 text-rose-600 border-rose-500/20 dark:bg-rose-500/20 dark:text-rose-400",
 };
 
 export function ProjectCard({ project }: ProjectCardProps) {
@@ -58,7 +58,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
                 <div className="flex items-center gap-2 mb-5">
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-bold border ${badgeColor}`}>
-                        {project.status === 'GREEN' ? 'No Prazo' : project.status === 'YELLOW' ? 'Atenção' : 'Atrasado'}
+                        {project.status === 'GREEN' ? 'No Prazo' : project.status === 'YELLOW' ? 'Em Atenção' : 'Atrasado'}
                     </span>
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-bold border border-border text-muted-foreground bg-secondary">
                         {project.classification?.replace('_', ' ') || 'PROJETO'}

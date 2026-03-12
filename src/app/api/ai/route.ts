@@ -14,41 +14,58 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Campos nome, orçamento e problemas são obrigatórios' }, { status: 400 });
         }
 
-        const prompt = `
-      Você atua como um PMO Master. Analise os dados do projeto abaixo e retorne ESTRITAMENTE um arquivo JSON válido usando a seguinte estrutura:
-      
-      {
-        "classification": "TRADITIONAL" | "AGILE" | "HYBRID",
-        "businessCase": "Um texto de storytelling corporativo justificando o projeto com base nos retornos e impactos.",
-        "preliminaryScope": "Uma descrição macro do que será entregue para resolver os problemas.",
-        "initialRisks": [
-           { "description": "Risco 1", "probability": 1 a 5, "impact": 1 a 5 },
-           { "description": "Risco 2", "probability": 1 a 5, "impact": 1 a 5 }
-        ]
-      }
+        const prompt = `Você atua como um PMO Master certificado PMP com vasta experiência em gestão de projetos corporativos.
+Analise os dados do projeto abaixo e retorne ESTRITAMENTE um JSON válido.
 
-      Dados do Projeto:
-      Nome: ${name}
-      Gerente: ${manager}
-      Orçamento: R$ ${budget}
-      Stakeholders: ${stakeholders}
-      Problemas a resolver: ${problems}
-      Retornos Esperados: ${returns}
-      Impactos: ${impacts}
+## Instruções detalhadas por campo:
 
-      Retorne apenas o JSON, sem marcações markdown ou texto antes/depois.
-    `;
+**classification**: Classifique como TRADITIONAL (projetos com escopo bem definido, baixa incerteza), AGILE (projetos com requisitos evolutivos, entregas incrementais) ou HYBRID (combina ambos). Considere o tipo de problema, orçamento e stakeholders.
+
+**businessCase**: Escreva um business case profissional de 3-4 parágrafos em formato narrativo corporativo. Deve conter: (1) contexto do problema, (2) justificativa estratégica do investimento, (3) benefícios esperados quantificados, (4) consequências de não agir. Não use bullet points.
+
+**preliminaryScope**: Descrição macro de 2-3 parágrafos do que será entregue. Inclua: entregas principais, limites do escopo (o que está fora), e abordagem técnica resumida.
+
+**preliminaryTimeline**: Cronograma resumido em texto com fases principais e duração estimada de cada uma. Exemplo: "Fase 1 - Descoberta e Planejamento (3 semanas): levantamento de requisitos e definição de arquitetura. Fase 2 - Desenvolvimento (8 semanas): implementação das funcionalidades core..."
+
+**milestones**: Array de 4-6 marcos principais do projeto em ordem cronológica. Exemplo: ["Kickoff e Aprovação do Escopo", "Conclusão do MVP", "Testes de Aceitação", "Go-Live", "Encerramento e Lições Aprendidas"]
+
+**successCriteria**: Array de 3-5 critérios de sucesso mensuráveis e específicos. Exemplo: ["Redução de 30% no tempo de processamento até Q3", "NPS do usuário final acima de 8.0", "ROI positivo em 12 meses"]
+
+**initialRisks**: Array de 3-5 riscos com campos: description (texto descritivo), probability (1 a 5), impact (1 a 5), category (Técnico|Organizacional|Externo|Financeiro|Gerenciamento de Projeto), mitigation (estratégia de mitigação concreta).
+
+## Estrutura JSON esperada:
+{
+  "classification": "TRADITIONAL" | "AGILE" | "HYBRID",
+  "businessCase": "Texto narrativo completo...",
+  "preliminaryScope": "Descrição macro do escopo...",
+  "preliminaryTimeline": "Fase 1 - Nome (duração): descrição. Fase 2 - ...",
+  "milestones": ["Marco 1", "Marco 2", "Marco 3", "Marco 4"],
+  "successCriteria": ["Critério mensurável 1", "Critério mensurável 2"],
+  "initialRisks": [
+    { "description": "Descrição do risco", "probability": 3, "impact": 4, "category": "Técnico", "mitigation": "Estratégia de mitigação" }
+  ]
+}
+
+## Dados do Projeto:
+Nome: ${name}
+Gerente: ${manager || 'Não definido'}
+Orçamento: R$ ${Number(budget).toLocaleString('pt-BR')}
+Stakeholders: ${stakeholders || 'Não informado'}
+Problemas a resolver: ${problems}
+Retornos Esperados: ${returns || 'Não informado'}
+Impactos de Não Solução: ${impacts || 'Não informado'}
+
+Retorne apenas o JSON, sem marcações markdown ou texto antes/depois.`;
 
         let response;
         try {
             response = await ai.models.generateContent({
-                model: 'gemini-3.1-pro',
+                model: 'gemini-2.5-flash',
                 contents: prompt,
             });
         } catch (apiError) {
             const err = apiError as Error;
-            console.warn('Fallback triggered: gemini-3.1-pro failed.', err.message || err);
-            // Attempt fallback with gemini-2.5-pro
+            console.warn('Fallback triggered: gemini-2.5-flash failed.', err.message || err);
             response = await ai.models.generateContent({
                 model: 'gemini-2.5-pro',
                 contents: prompt,
@@ -56,8 +73,6 @@ export async function POST(req: NextRequest) {
         }
 
         let rawText = response.text || "{}";
-
-        // Cleanup potential markdown blocks from LLM
         rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
 
         let result;
@@ -70,7 +85,7 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json(result);
     } catch (error) {
-            const err = error as Error;
+        const err = error as Error;
         console.error('Error generating AI content:', err);
         return NextResponse.json({ error: err.message || 'Erro interno no servidor' }, { status: 500 });
     }

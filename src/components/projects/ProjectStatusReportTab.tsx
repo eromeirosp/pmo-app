@@ -14,9 +14,12 @@ import {
   FileText,
   Loader2,
   Trash2,
+  Sparkles,
 } from 'lucide-react';
 import { TabHeader } from "./TabHeader";
 import { toast } from "sonner";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -111,6 +114,7 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
   const [accomplishments, setAccomplishments] = useState("");
   const [nextSteps, setNextSteps] = useState("");
   const [issues, setIssues] = useState("");
+  const [aiSuggesting, setAiSuggesting] = useState(false);
 
   const baseUrl = `/api/projects/${projectId}/status-reports`;
 
@@ -194,6 +198,95 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
     }
   };
 
+  const handleAiSuggest = async () => {
+    setAiSuggesting(true);
+    try {
+      const res = await fetch("/api/ai/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, type: "status_report" }),
+      });
+      if (!res.ok) throw new Error("Erro na IA");
+      const data = await res.json();
+      if (data.accomplishments) setAccomplishments(typeof data.accomplishments === "string" ? data.accomplishments : JSON.stringify(data.accomplishments));
+      if (data.nextSteps) setNextSteps(typeof data.nextSteps === "string" ? data.nextSteps : JSON.stringify(data.nextSteps));
+      if (data.issues) setIssues(typeof data.issues === "string" ? data.issues : JSON.stringify(data.issues));
+      toast.success("Sugestões da IA aplicadas! Revise antes de salvar.");
+    } catch {
+      toast.error("Erro ao gerar sugestões com IA.");
+    } finally {
+      setAiSuggesting(false);
+    }
+  };
+
+  const handleExport = async () => {
+    if (reports.length === 0) {
+      toast.error("Nenhum dado para exportar.");
+      return;
+    }
+
+    try {
+      const doc = new jsPDF();
+      
+      // Title
+      doc.setFontSize(18);
+      doc.text("Histórico de Relatórios de Status", 14, 22);
+      
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      doc.text(`Projeto ID: ${projectId}`, 14, 30);
+      doc.text(`Data de Exportação: ${new Date().toLocaleDateString('pt-BR')}`, 14, 35);
+
+      const tableData = reports.map(report => [
+        report.period,
+        report.overallStatus,
+        report.progress + "%",
+        new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(report.budgetSpent || 0),
+        report.reportDate ? new Date(report.reportDate).toLocaleDateString('pt-BR') : "—"
+      ]);
+
+      autoTable(doc, {
+        startY: 45,
+        head: [["Período", "Status Geral", "Progresso", "Gasto", "Data"]],
+        body: tableData,
+        headStyles: { fillColor: [201, 163, 85], textColor: [255, 255, 255] }, // Compass Gold
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { top: 45 },
+      });
+
+      // Add a second page for detailed content if needed, or just append it below? 
+      // For now, let's just do a summary table as it's the most common request for "Export All".
+      // If we wanted to export EVERYTHING including descriptions, we'd need a more complex layout.
+      
+      const filename = `Status_Reports_Projeto_${projectId}.pdf`;
+      const pdfData = doc.output('arraybuffer');
+      const blob = new Blob([pdfData], { type: 'application/pdf' });
+
+      if ('showSaveFilePicker' in window) {
+        const handle = await (window as unknown as { showSaveFilePicker: (opts: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker({
+          suggestedName: filename,
+          types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+      } else {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      }
+      toast.success("PDF gerado com sucesso!");
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      toast.error("Erro ao gerar PDF.");
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(dateStr));
   };
@@ -226,7 +319,10 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
           description="Acompanhe a evolução e saúde do seu projeto"
           actions={
             <>
-              <button className="flex items-center gap-2 rounded-xl h-10 px-4 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 font-medium text-sm transition-all duration-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-white/20 active:scale-[0.98]">
+              <button 
+                onClick={handleExport}
+                className="flex items-center gap-2 rounded-xl h-10 px-4 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 font-medium text-sm transition-all duration-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-white/20 active:scale-[0.98] cursor-pointer"
+              >
                 <Download className="w-5 h-5" />
                 Exportar Tudo
               </button>
@@ -551,6 +647,18 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
             </div>
 
             <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Narrativa do Período</h4>
+                <button
+                  type="button"
+                  onClick={handleAiSuggest}
+                  disabled={aiSuggesting}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {aiSuggesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  Sugerir com IA
+                </button>
+              </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
                   Realizações no Período

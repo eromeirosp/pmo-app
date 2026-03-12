@@ -18,7 +18,7 @@ interface StatusDonutChartProps {
 const STATUS_COLORS = {
   "No Prazo": "var(--chart-2)",    // Emerald
   "Em Atenção": "var(--chart-4)",  // Amber
-  Críticos: "var(--chart-5)",      // Rose
+  Atrasado: "var(--chart-5)",      // Rose
 };
 
 const CustomTooltip = ({
@@ -31,7 +31,7 @@ const CustomTooltip = ({
   if (active && payload && payload.length) {
     const item = payload[0];
     return (
-      <div className="bg-popover border border-border rounded-lg shadow-2xl px-3 py-2 text-sm backdrop-blur-md">
+      <div className="bg-popover border border-border rounded-lg shadow-2xl px-3 py-2 text-sm">
         <p className="font-semibold text-foreground">{item.name}</p>
         <p className="text-muted-foreground">
           {item.value} projeto{item.value !== 1 ? "s" : ""} · {item.payload.pct}%
@@ -57,7 +57,7 @@ export function StatusDonutChart({ green, yellow, red }: StatusDonutChartProps) 
       pct: total > 0 ? Math.round((yellow / total) * 100) : 0,
     },
     {
-      name: "Críticos",
+      name: "Atrasado",
       value: red,
       pct: total > 0 ? Math.round((red / total) * 100) : 0,
     },
@@ -92,7 +92,7 @@ export function StatusDonutChart({ green, yellow, red }: StatusDonutChartProps) 
               />
             ))}
           </Pie>
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 10 }} />
           <Legend
             iconType="circle"
             iconSize={8}
@@ -105,7 +105,7 @@ export function StatusDonutChart({ green, yellow, red }: StatusDonutChartProps) 
         </PieChart>
       </ResponsiveContainer>
       {/* Center label */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8 z-0">
         <span className="text-3xl font-bold text-foreground tracking-tight">{total}</span>
         <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">projetos</span>
       </div>

@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Project } from "@prisma/client";
+import { Project, Risk } from "@prisma/client";
 import {
   FileText, Lightbulb, CheckCircle2, Trash2, Plus,
-  Package, Pin, Ban, AlertTriangle, Save, Loader2
+  Package, Pin, Ban, AlertTriangle, Save, Loader2, Sparkles, X
 } from "lucide-react";
 import { TabHeader } from "./TabHeader";
+import { toast } from "sonner";
 
 interface ProjectCharterTabProps {
-  project: Project;
+  project: Project & { risks?: Risk[] };
+  saveTrigger?: number;
 }
 
 interface CharterRow {
@@ -25,6 +27,13 @@ const TYPES = {
   RESTRICTION: "RESTRICTION",
 } as const;
 
+const SUGGEST_TYPE_MAP: Record<string, string> = {
+  CRITERIA: "charter_criteria",
+  DELIVERABLE: "charter_deliverables",
+  PREMISE: "charter_premises",
+  RESTRICTION: "charter_restrictions",
+};
+
 interface ListSectionProps {
   title: string;
   icon: React.ReactNode;
@@ -33,11 +42,15 @@ interface ListSectionProps {
   addLabel: string;
   onAdd: (text: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
+  projectId: string;
+  charterType: string;
 }
 
-function ListSection({ title, icon, items, loading, addLabel, onAdd, onRemove }: ListSectionProps) {
+function ListSection({ title, icon, items, loading, addLabel, onAdd, onRemove, projectId, charterType }: ListSectionProps) {
   const [inputValue, setInputValue] = useState("");
   const [saving, setSaving] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   const handleAdd = async () => {
     if (!inputValue.trim()) return;
@@ -47,11 +60,82 @@ function ListSection({ title, icon, items, loading, addLabel, onAdd, onRemove }:
     setSaving(false);
   };
 
+  const handleSuggest = async () => {
+    setSuggesting(true);
+    setSuggestions([]);
+    try {
+      const res = await fetch("/api/ai/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          type: SUGGEST_TYPE_MAP[charterType],
+        }),
+      });
+      if (!res.ok) throw new Error("Erro na IA");
+      const data = await res.json();
+      const raw = data.suggestions || [];
+      // Ensure all suggestions are strings (AI may return objects)
+      setSuggestions(raw.map((s: unknown) => typeof s === "string" ? s : typeof s === "object" && s !== null && "text" in s ? String((s as { text: string }).text) : JSON.stringify(s)));
+    } catch {
+      toast.error("Erro ao gerar sugestões com IA.");
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
+  const handleAcceptSuggestion = async (text: string) => {
+    setSuggestions((prev) => prev.filter((s) => s !== text));
+    await onAdd(text);
+    toast.success("Item adicionado!");
+  };
+
+  const handleDismissSuggestion = (text: string) => {
+    setSuggestions((prev) => prev.filter((s) => s !== text));
+  };
+
   return (
     <div className="bg-card rounded-xl border border-border p-6">
-      <h3 className="text-slate-900 dark:text-white text-md font-bold mb-4 flex items-center gap-2">
-        {icon}{title}
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-slate-900 dark:text-white text-md font-bold flex items-center gap-2">
+          {icon}{title}
+        </h3>
+        <button
+          onClick={handleSuggest}
+          disabled={suggesting}
+          className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors cursor-pointer disabled:opacity-50"
+        >
+          {suggesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+          Sugerir com IA
+        </button>
+      </div>
+
+      {/* AI Suggestions */}
+      {suggestions.length > 0 && (
+        <div className="mb-4 space-y-2 bg-primary/5 border border-primary/20 rounded-lg p-3">
+          <p className="text-xs font-semibold text-primary flex items-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5" /> Sugestões da IA
+          </p>
+          {suggestions.map((s, i) => (
+            <div key={i} className="flex items-start gap-2 bg-background/80 rounded-lg p-2.5">
+              <span className="flex-1 text-sm text-foreground break-words min-w-0">{s}</span>
+              <button
+                onClick={() => handleAcceptSuggestion(s)}
+                className="shrink-0 text-xs font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5 inline mr-0.5" />Adicionar
+              </button>
+              <button
+                onClick={() => handleDismissSuggestion(s)}
+                className="shrink-0 text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center text-slate-400 text-sm py-2">
           <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando...
@@ -96,10 +180,16 @@ function ListSection({ title, icon, items, loading, addLabel, onAdd, onRemove }:
   );
 }
 
-export function ProjectCharterTab({ project }: ProjectCharterTabProps) {
+export function ProjectCharterTab({ project, saveTrigger }: ProjectCharterTabProps) {
   const [items, setItems] = useState<CharterRow[]>([]);
   const [loading, setLoading] = useState(true);
   const baseUrl = `/api/projects/${project.id}/charter`;
+
+  useEffect(() => {
+    if (saveTrigger && saveTrigger > 0) {
+      toast.success("Termo de Abertura atualizado.");
+    }
+  }, [saveTrigger]);
 
   useEffect(() => {
     fetch(baseUrl)
@@ -133,7 +223,10 @@ export function ProjectCharterTab({ project }: ProjectCharterTabProps) {
           title="Termo de Abertura (Project Charter)"
           description="Documento formal que autoriza o projeto e define escopo inicial."
           actions={
-            <button className="flex items-center gap-2 rounded-xl h-10 px-4 bg-primary text-white font-medium text-sm hover:bg-primary/90 transition-all active:scale-[0.98]">
+            <button
+              onClick={() => toast.success("Termo de Abertura salvo com sucesso!")}
+              className="flex items-center gap-2 rounded-xl h-10 px-4 bg-primary text-white font-medium text-sm hover:bg-primary/90 transition-all active:scale-[0.98] cursor-pointer"
+            >
               <Save className="w-4 h-4" /> Salvar
             </button>
           }
@@ -175,6 +268,8 @@ export function ProjectCharterTab({ project }: ProjectCharterTabProps) {
           addLabel="Adicionar critério de sucesso..."
           onAdd={(text) => handleAdd(TYPES.CRITERIA, text)}
           onRemove={handleRemove}
+          projectId={project.id}
+          charterType={TYPES.CRITERIA}
         />
         <ListSection
           title="Principais Entregas"
@@ -184,6 +279,8 @@ export function ProjectCharterTab({ project }: ProjectCharterTabProps) {
           addLabel="Adicionar entrega principal..."
           onAdd={(text) => handleAdd(TYPES.DELIVERABLE, text)}
           onRemove={handleRemove}
+          projectId={project.id}
+          charterType={TYPES.DELIVERABLE}
         />
         <ListSection
           title="Premissas"
@@ -193,6 +290,8 @@ export function ProjectCharterTab({ project }: ProjectCharterTabProps) {
           addLabel="Adicionar premissa..."
           onAdd={(text) => handleAdd(TYPES.PREMISE, text)}
           onRemove={handleRemove}
+          projectId={project.id}
+          charterType={TYPES.PREMISE}
         />
         <ListSection
           title="Restrições"
@@ -202,6 +301,8 @@ export function ProjectCharterTab({ project }: ProjectCharterTabProps) {
           addLabel="Adicionar restrição..."
           onAdd={(text) => handleAdd(TYPES.RESTRICTION, text)}
           onRemove={handleRemove}
+          projectId={project.id}
+          charterType={TYPES.RESTRICTION}
         />
       </div>
 
@@ -211,9 +312,16 @@ export function ProjectCharterTab({ project }: ProjectCharterTabProps) {
           <AlertTriangle className="h-5 w-5" /> Riscos Iniciais Identificados
         </h3>
         <ul className="space-y-2 text-sm text-amber-700 dark:text-amber-500">
-          <li className="flex items-start gap-2"><span className="font-bold">•</span> Resistência dos usuários à mudança de processos e sistemas.</li>
-          <li className="flex items-start gap-2"><span className="font-bold">•</span> Qualidade e consistência dos dados legados a serem migrados.</li>
-          <li className="flex items-start gap-2"><span className="font-bold">•</span> Indisponibilidade de key users para participação ativa no projeto.</li>
+          {!project.risks || project.risks.length === 0 ? (
+            <li className="italic text-amber-600/70">Nenhum risco inicial cadastrado.</li>
+          ) : (
+            project.risks.map((risk) => (
+              <li key={risk.id} className="flex items-start gap-2">
+                <span className="font-bold shrink-0">•</span>
+                <span>{risk.description}</span>
+              </li>
+            ))
+          )}
         </ul>
         <p className="text-xs text-amber-500 mt-3 flex items-center gap-1">
           <Lightbulb className="h-3.5 w-3.5" /> Riscos detalhados são gerenciados na aba &quot;Matriz de Risco&quot;.

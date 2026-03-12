@@ -109,7 +109,7 @@ export default function DocumentCenter() {
 
     return (
         <div className="flex min-h-screen flex-col bg-slate-50">
-            <Topbar title={`Centro de Documentos - ${project.name}`} />
+            <Topbar />
 
             <main className="flex-1 container mx-auto px-4 md:px-6 py-8 md:py-10">
                 <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Plus, User } from "lucide-react";
+import { User } from "lucide-react";
 import { ThemeToggle } from './ThemeToggle';
 import { Button } from "@/components/ui/button";
+import { CreateProjectButton } from "@/components/projects/CreateProjectModal";
 
 export default function Topbar() {
     return (
@@ -15,28 +16,20 @@ export default function Topbar() {
                         Gestão de documentos de projetos
                     </span>
                 </Link>
-                
+
                 <div className="flex items-center gap-3 sm:gap-4">
                     <ThemeToggle />
-                    
+
                     <Button variant="ghost" size="icon" className="hidden sm:flex text-muted-foreground hover:text-foreground rounded-full hover:bg-accent/50">
                         <User className="h-5 w-5" />
                     </Button>
-                    
+
                     <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-accent/30 text-[12px] font-bold text-muted-foreground">
                         <User className="h-3.5 w-3.5 text-primary" />
                         <span>Usuário Regular</span>
                     </div>
-                    
-                    <Link href="/projects/new">
-                        <Button className="hidden sm:flex bg-primary hover:bg-primary/90 text-primary-foreground h-9 px-4 rounded-xl font-bold tracking-tight transition-all shadow-lg shadow-primary/20">
-                            <Plus className="mr-2 h-4 w-4" />
-                            Novo Projeto
-                        </Button>
-                        <Button size="icon" className="sm:hidden bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-lg shadow-primary/20">
-                            <Plus className="h-4 w-4" />
-                        </Button>
-                    </Link>
+
+                    <CreateProjectButton />
                 </div>
             </div>
         </header>

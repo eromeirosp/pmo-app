@@ -25,7 +25,7 @@ const CustomTooltip = ({
 }) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-popover border border-border rounded-lg shadow-2xl px-3 py-2 text-sm backdrop-blur-md">
+      <div className="bg-popover border border-border rounded-lg shadow-2xl px-3 py-2 text-sm">
         <p className="font-semibold text-foreground">{label}</p>
         <p className="text-muted-foreground mt-0.5">
           {payload[0].value} projeto{payload[0].value !== 1 ? "s" : ""} criado

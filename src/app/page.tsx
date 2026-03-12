@@ -95,6 +95,19 @@ export default function Home() {
   const filteredProjects = useMemo(() => {
     let result = [...projects];
 
+    // Search filter
+    if (searchTerm.trim()) {
+      const lowerSearch = searchTerm.toLowerCase().trim();
+      result = result.filter((p) => {
+        const match = 
+          p.name.toLowerCase().includes(lowerSearch) || 
+          p.manager.toLowerCase().includes(lowerSearch) ||
+          p.id.toLowerCase().includes(lowerSearch);
+        return match;
+      });
+      console.log(`[Dashboard] Search for "${lowerSearch}" matched ${result.length} projects.`);
+    }
+
     if (filterStatus !== "all") {
       result = result.filter((p) => p.status === filterStatus);
     }
@@ -129,7 +142,7 @@ export default function Home() {
     }
 
     return result;
-  }, [projects, filterStatus, filterDate, filterSort]);
+  }, [projects, filterStatus, filterDate, filterSort, searchTerm]);
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground transition-colors duration-300">
@@ -206,7 +219,7 @@ export default function Home() {
                     : 'bg-background/40 hover:bg-background/60 text-muted-foreground border-border'
                 }`}
               >
-                {status === 'all' ? 'Todos' : status === 'GREEN' ? 'No Prazo' : status === 'YELLOW' ? 'Em Atenção' : 'Críticos'}
+                {status === 'all' ? 'Todos' : status === 'GREEN' ? 'No Prazo' : status === 'YELLOW' ? 'Em Atenção' : 'Atrasado'}
               </button>
             ))}
           </div>

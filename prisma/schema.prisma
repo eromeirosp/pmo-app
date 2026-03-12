@@ -8,31 +8,34 @@ datasource db {
 }
 
 model Project {
-  id               String          @id @default(uuid())
+  id               String           @id @default(uuid())
   name             String
   manager          String
   budget           Float
   stakeholders     String?
-  status           String          @default("GREEN")
+  status           String           @default("GREEN")
   classification   String?
-  department       String?
-  description      String?
-  startDate        DateTime?
-  endDate          DateTime?
   problems         String?
   returns          String?
-  impacts          String?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  impacts              String?
+  preliminaryTimeline  String?
+  milestones           String?
+  successCriteria      String?
+  createdAt            DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  department       String?
+  description      String?
+  endDate          DateTime?
+  startDate        DateTime?
   artifacts        Artifact[]
-  eapItems         EAPItem[]
-  versions         ProjectVersion[]
-  risks            Risk[]
-  statusReports    StatusReport[]
-  objectives       Objective[]
-  stakeholdersList Stakeholder[]
   charterItems     CharterItem[]
   closingItems     ClosingItem[]
+  eapItems         EAPItem[]
+  objectives       Objective[]
+  versions         ProjectVersion[]
+  risks            Risk[]
+  stakeholdersList Stakeholder[]
+  statusReports    StatusReport[]
 }
 
 model Objective {
@@ -99,6 +102,7 @@ model EAPItem {
   description String?
   parentId    String?
   status      String   @default("PENDING")
+  order       Float    @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -107,36 +111,36 @@ model EAPItem {
 model Risk {
   id          String   @id @default(uuid())
   projectId   String
-  title       String   @default("")
   description String
-  level       String   @default("Médio")
-  category    String   @default("Geral")
-  responsible String?
-  mitigation  String?
-  contingency String?
   probability Int
   impact      Int
   status      String   @default("IDENTIFIED")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  category    String   @default("Geral")
+  contingency String?
+  level       String   @default("Médio")
+  mitigation  String?
+  responsible String?
+  title       String   @default("")
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model StatusReport {
   id              String   @id @default(uuid())
   projectId       String
-  period          String
-  overallStatus   String   @default("Verde")
-  scopeStatus     String   @default("No Escopo")
-  scheduleStatus  String   @default("No Prazo")
-  budgetStatus    String   @default("Em Dia")
-  progress        Float    @default(0)
-  budgetSpent     Float?
-  accomplishments String?  @db.Text
-  nextSteps       String?  @db.Text
-  issues          String?  @db.Text
   reportDate      DateTime @default(now())
+  nextSteps       String?
   createdAt       DateTime @default(now())
+  accomplishments String?
+  budgetSpent     Float?
+  budgetStatus    String   @default("Em Dia")
+  issues          String?
+  overallStatus   String   @default("Verde")
+  period          String
+  progress        Float    @default(0)
+  scheduleStatus  String   @default("No Prazo")
+  scopeStatus     String   @default("No Escopo")
   updatedAt       DateTime @updatedAt
   project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
@@ -144,13 +148,13 @@ model StatusReport {
 model AuditLog {
   id        String   @id @default(uuid())
   projectId String
-  userId    String?  // For future auth integration
+  userId    String?
   userName  String?  @default("Usuário Sistema")
-  action    String   // CREATE, UPDATE, DELETE
-  entity    String   // Risk, Objective, etc.
+  action    String
+  entity    String
   entityId  String?
-  field     String?  // Specific field changed if applicable
-  oldValue  String?  @db.Text
-  newValue  String?  @db.Text
+  field     String?
+  oldValue  String?
+  newValue  String?
   createdAt DateTime @default(now())
 }

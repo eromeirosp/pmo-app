@@ -22,6 +22,7 @@ export default function ProjectDetailsPage() {
   const [project, setProject] = useState<Project & { artifacts: Artifact[]; risks: Risk[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("informacoes");
+  const [saveTrigger, setSaveTrigger] = useState(0);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -72,15 +73,18 @@ export default function ProjectDetailsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background transition-colors duration-300">
       <Topbar />
-      <ProjectHeader project={project} />
+      <ProjectHeader 
+        project={project} 
+        onSave={() => setSaveTrigger(prev => prev + 1)} 
+      />
 
       <main className="max-w-[1200px] mx-auto w-full px-6 py-8 flex-1">
         <ProjectTabs activeTab={activeTab} onTabChange={handleTabChange} />
 
         <div className="mt-2">
-          {activeTab === "informacoes" && <ProjectInfoTab project={project} />}
-          {activeTab === "pre-projeto" && <ProjectPreProjectTab project={project} />}
-          {activeTab === "termo-abertura" && <ProjectCharterTab project={project} />}
+          {activeTab === "informacoes" && <ProjectInfoTab project={project} saveTrigger={saveTrigger} />}
+          {activeTab === "pre-projeto" && <ProjectPreProjectTab project={project} saveTrigger={saveTrigger} />}
+          {activeTab === "termo-abertura" && <ProjectCharterTab project={project} saveTrigger={saveTrigger} />}
           {activeTab === "matriz-risco" && <ProjectRiskTab project={project} />}
           {activeTab === "eap" && <ProjectEapTab projectId={project.id} />}
           {activeTab === "status-report" && <ProjectStatusReportTab projectId={project.id} />}

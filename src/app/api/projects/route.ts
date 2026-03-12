@@ -16,6 +16,9 @@ export async function POST(req: NextRequest) {
             classification,
             businessCase,
             preliminaryScope,
+            preliminaryTimeline,
+            milestones,
+            successCriteria,
             initialRisks,
         } = data;
 
@@ -38,6 +41,9 @@ export async function POST(req: NextRequest) {
                 problems,
                 returns,
                 impacts,
+                preliminaryTimeline,
+                milestones: milestones ? JSON.stringify(milestones) : null,
+                successCriteria: successCriteria ? JSON.stringify(successCriteria) : null,
                 status: 'GREEN',
                 artifacts: {
                     create: [
@@ -56,10 +62,12 @@ export async function POST(req: NextRequest) {
                     ],
                 },
                 risks: {
-                    create: (initialRisks || []).map((risk: {description: string; probability: string; impact: string}) => ({
+                    create: (initialRisks || []).map((risk: {description: string; probability: string; impact: string; category?: string; mitigation?: string}) => ({
                         description: risk.description,
                         probability: parseInt(risk.probability),
                         impact: parseInt(risk.impact),
+                        category: risk.category || "Geral",
+                        mitigation: risk.mitigation || null,
                         status: "IDENTIFIED",
                     })),
                 },

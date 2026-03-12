@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Project } from "@prisma/client";
-import { AlertTriangle, PlusCircle, Plus, Trash2, Loader2, AlertCircle, Pencil } from "lucide-react";
+import { AlertTriangle, PlusCircle, Plus, Trash2, Loader2, AlertCircle, Pencil, Sparkles, X } from "lucide-react";
 import { TabHeader } from "./TabHeader";
 import { toast } from "sonner";
 import {
@@ -65,6 +65,8 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
     probability: "Média", impact: "Alto", status: "Em Monitoramento",
     responsible: "", mitigation: "", contingency: "",
   });
+  const [aiSuggesting, setAiSuggesting] = useState(false);
+  const [suggestedRisks, setSuggestedRisks] = useState<{ title: string; description: string; probability: number; impact: number; category: string; mitigation: string }[]>([]);
 
   const baseUrl = `/api/projects/${project.id}/risks`;
 
@@ -189,6 +191,71 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
     }
   }, [baseUrl, editingRisk, editForm]);
 
+  const handleAiSuggest = async () => {
+    setAiSuggesting(true);
+    setSuggestedRisks([]);
+    try {
+      const res = await fetch("/api/ai/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: project.id, type: "risk_suggest" }),
+      });
+      if (!res.ok) throw new Error("Erro na IA");
+      const data = await res.json();
+      const raw = data.suggestions || [];
+      // Validate each suggestion has required fields
+      setSuggestedRisks(raw.filter((s: any) => s && typeof s === "object" && s.title).map((s: any) => ({
+        title: String(s.title || ""),
+        description: String(s.description || ""),
+        probability: Number(s.probability) || 3,
+        impact: Number(s.impact) || 3,
+        category: String(s.category || "Geral"),
+        mitigation: String(s.mitigation || ""),
+      })));
+    } catch {
+      toast.error("Erro ao gerar sugestões de riscos com IA.");
+    } finally {
+      setAiSuggesting(false);
+    }
+  };
+
+  const handleAcceptSuggestion = async (suggestion: typeof suggestedRisks[0]) => {
+    setSuggestedRisks((prev) => prev.filter((s) => s !== suggestion));
+    const level = suggestion.impact >= 4 ? "Alto" : suggestion.impact <= 2 ? "Baixo" : "Médio";
+    const res = await fetch(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: suggestion.title,
+        description: suggestion.description,
+        level,
+        category: suggestion.category || "Geral",
+        mitigation: suggestion.mitigation,
+        status: "Identificado",
+        probability: suggestion.probability,
+        impact: suggestion.impact,
+      }),
+    });
+    const created = await res.json();
+    setRisks((prev) => [...prev, {
+      id: created.id,
+      level: created.level,
+      levelColor: LEVEL_COLORS[created.level] || LEVEL_COLORS["Médio"],
+      title: created.title,
+      status: created.status,
+      impact: created.level,
+      category: created.category || "Geral",
+      responsible: created.responsible || "—",
+      mitigation: created.mitigation || "—",
+      contingency: created.contingency || "—",
+    }]);
+    toast.success("Risco adicionado!");
+  };
+
+  const handleDismissSuggestion = (suggestion: typeof suggestedRisks[0]) => {
+    setSuggestedRisks((prev) => prev.filter((s) => s !== suggestion));
+  };
+
   const LEVEL_ORDER: Record<string, number> = { 
     "Muito Alto": 0, 
     "Alto": 1, 
@@ -210,8 +277,63 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
           icon={AlertTriangle}
           title="Matriz de Riscos"
           description="Identificação, avaliação e mitigação de riscos estruturais do projeto."
+          actions={
+            <button
+              onClick={handleAiSuggest}
+              disabled={aiSuggesting}
+              className="flex items-center gap-2 rounded-xl h-10 px-4 bg-primary/10 text-primary font-medium text-sm hover:bg-primary/20 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
+            >
+              {aiSuggesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              Sugerir Riscos com IA
+            </button>
+          }
         />
       </div>
+
+      {/* AI Risk Suggestions */}
+      {suggestedRisks.length > 0 && (
+        <div className="space-y-4 bg-primary/5 border border-primary/20 rounded-xl p-5">
+          <p className="text-sm font-bold text-primary flex items-center gap-2">
+            <Sparkles className="h-4 w-4" /> Riscos Sugeridos pela IA
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {suggestedRisks.map((s, i) => (
+              <div key={i} className="bg-background/80 rounded-xl p-4 border border-border space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="font-bold text-sm text-foreground">{s.title}</h4>
+                  <button
+                    onClick={() => handleDismissSuggestion(s)}
+                    className="shrink-0 text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">{s.description}</p>
+                <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase">
+                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    Prob: {s.probability}/5
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                    Impacto: {s.impact}/5
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                    {s.category}
+                  </span>
+                </div>
+                {s.mitigation && (
+                  <p className="text-xs text-slate-500"><span className="font-semibold">Mitigação:</span> {s.mitigation}</p>
+                )}
+                <button
+                  onClick={() => handleAcceptSuggestion(s)}
+                  className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-white bg-emerald-50 hover:bg-emerald-600 dark:bg-emerald-900/20 dark:hover:bg-emerald-600 px-3 py-2 rounded-lg transition-all cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Adicionar Risco
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Risk Cards Grid */}
       {loading ? (

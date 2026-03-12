@@ -1,6 +1,6 @@
 "use client";
 
-import { TrendingUp, TrendingDown, Minus, LucideIcon } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, CheckCircle2, AlertCircle, XCircle, DollarSign, PieChart } from "lucide-react";
 
 interface KPICardProps {
   title: string;
@@ -19,14 +19,17 @@ function KPICard({ title, value, sub, trend, trendUp, icon }: KPICardProps) {
           <div className="text-primary">{icon}</div>
         </div>
         {trend && (
-          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[12px] font-bold ${
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
             trendUp 
-              ? 'bg-emerald-500/10 text-emerald-500' 
+              ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
               : trendUp === false 
-              ? 'bg-rose-500/10 text-rose-500'
-              : 'bg-muted text-muted-foreground'
+              ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+              : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
           }`}>
-            {trendUp ? '↑' : trendUp === false ? '↓' : ''} {trend}
+            {trendUp === true && <TrendingUp size={12} className="shrink-0" />}
+            {trendUp === false && <TrendingDown size={12} className="shrink-0" />}
+            {trendUp === undefined && <Minus size={12} className="shrink-0" />}
+            <span>{trend}</span>
           </div>
         )}
       </div>
@@ -83,37 +86,37 @@ export function StatsKPIRow({
       <KPICard 
         title="Total de Projetos" 
         value={total} 
-        icon={<TrendingUp size={20} />} 
+        icon={<PieChart size={20} />} 
       />
       <KPICard 
         title="No Prazo" 
         value={green} 
         sub={`${healthPct}% do portfólio`}
-        trend={`${healthPct}%`}
-        trendUp={healthPct >= 60}
-        icon={<TrendingUp size={20} />} 
+        trend="Saudável"
+        trendUp={true}
+        icon={<CheckCircle2 size={20} />} 
       />
       <KPICard 
         title="Em Atenção" 
         value={yellow} 
         sub={total > 0 ? `${Math.round((yellow / total) * 100)}% em risco` : "0%"}
-        trend={yellow === 0 ? "Bom" : "Risco"}
-        trendUp={yellow === 0}
-        icon={<Minus size={20} />} 
+        trend={yellow === 0 ? "Limpo" : "Atenção"}
+        trendUp={yellow === 0 ? true : undefined}
+        icon={<AlertCircle size={20} />} 
       />
       <KPICard 
-        title="Críticos" 
+        title="Atrasado" 
         value={red} 
         sub={total > 0 ? `${Math.round((red / total) * 100)}% urgentes` : "0%"}
-        trend={red === 0 ? "Limpo" : "Urgente"}
-        trendUp={red === 0}
-        icon={<TrendingDown size={20} />} 
+        trend={red === 0 ? "Limpo" : "Atrasado"}
+        trendUp={red === 0 ? true : false}
+        icon={<XCircle size={20} />} 
       />
       <KPICard 
         title="Orçamento Total" 
         value={formatBRL(totalBudget)} 
         sub={`Média ${formatBRL(avgBudget)}`}
-        icon={<TrendingUp size={20} />} 
+        icon={<DollarSign size={20} />} 
       />
     </div>
   );
