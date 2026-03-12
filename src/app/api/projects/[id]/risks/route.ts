@@ -32,7 +32,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       contingency: contingency || null,
       probability: typeof probability === "number" ? probability : 3,
       impact: typeof impact === "number" ? impact : 3,
-      status: status || "IDENTIFIED",
+      status: status || "Identificado",
     },
   });
 

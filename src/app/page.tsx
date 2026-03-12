@@ -70,10 +70,14 @@ export default function Home() {
     setLoading(true);
     try {
       const res = await fetch(`/api/projects?search=${search}`);
+      if (!res.ok) {
+        throw new Error(`API returned ${res.status}`);
+      }
       const data = await res.json();
       setProjects(data);
     } catch (error) {
       console.error("Failed to fetch projects", error);
+      setProjects([]);
     } finally {
       setLoading(false);
     }
@@ -83,10 +87,14 @@ export default function Home() {
     setStatsLoading(true);
     try {
       const res = await fetch("/api/projects/stats");
+      if (!res.ok) {
+        throw new Error(`API returned ${res.status}`);
+      }
       const data = await res.json();
       setStats(data);
     } catch (error) {
       console.error("Failed to fetch stats", error);
+      setStats(null);
     } finally {
       setStatsLoading(false);
     }

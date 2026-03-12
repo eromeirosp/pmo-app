@@ -34,20 +34,34 @@ type RiskItem = {
   levelColor: string;
   title: string;
   status: string;
-  impact: string;
+  probability: number;
+  impact: number;
+  score: number;
   category: string;
   responsible: string;
   mitigation: string;
   contingency: string;
 };
 
-
 const LEVEL_COLORS: Record<string, string> = {
-  "Alto": "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   "Muito Alto": "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  "Alto": "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   "Médio": "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
   "Baixo": "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  "Muito Baixo": "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
 };
+
+const PROB_LABELS: Record<number, string> = { 1: "Muito Baixa", 2: "Baixa", 3: "Média", 4: "Alta", 5: "Muito Alta" };
+const IMPACT_LABELS: Record<number, string> = { 1: "Muito Baixo", 2: "Baixo", 3: "Médio", 4: "Alto", 5: "Muito Alto" };
+
+function calculateLevel(probability: number, impact: number): string {
+  const score = probability * impact;
+  if (score >= 16) return "Muito Alto";
+  if (score >= 10) return "Alto";
+  if (score >= 5) return "Médio";
+  if (score >= 3) return "Baixo";
+  return "Muito Baixo";
+}
 
 export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
   const [risks, setRisks] = useState<RiskItem[]>([]);
@@ -56,17 +70,17 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
   const [editingRisk, setEditingRisk] = useState<RiskItem | null>(null);
   const [editForm, setEditForm] = useState({
     title: "", category: "", description: "",
-    probability: "Média", impact: "Alto", status: "Em Monitoramento",
+    probability: 3, impact: 3, status: "Em Monitoramento",
     responsible: "", mitigation: "", contingency: "",
   });
   const [savingEdit, setSavingEdit] = useState(false);
   const [form, setForm] = useState({
     title: "", category: "", description: "",
-    probability: "Média", impact: "Alto", status: "Em Monitoramento",
+    probability: 3, impact: 3, status: "Em Monitoramento",
     responsible: "", mitigation: "", contingency: "",
   });
   const [aiSuggesting, setAiSuggesting] = useState(false);
-  const [suggestedRisks, setSuggestedRisks] = useState<{ title: string; description: string; probability: number; impact: number; category: string; mitigation: string }[]>([]);
+  const [suggestedRisks, setSuggestedRisks] = useState<{ title: string; description: string; probability: number; impact: number; category: string; mitigation: string; contingency: string }[]>([]);
 
   const baseUrl = `/api/projects/${project.id}/risks`;
 
@@ -75,18 +89,25 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
       .then((r) => r.json())
       .then((data: any[]) => {
         if (!Array.isArray(data)) return;
-        setRisks(data.map((r) => ({
-          id: r.id,
-          level: r.level || "Médio",
-          levelColor: LEVEL_COLORS[r.level] || LEVEL_COLORS["Médio"],
-          title: r.title || r.description,
-          status: r.status,
-          impact: r.level,
-          category: r.category || "Geral",
-          responsible: r.responsible || "—",
-          mitigation: r.mitigation || "—",
-          contingency: r.contingency || "—",
-        })));
+        setRisks(data.map((r) => {
+          const p = Number(r.probability) || 3;
+          const i = Number(r.impact) || 3;
+          const level = calculateLevel(p, i);
+          return {
+            id: r.id,
+            level,
+            levelColor: LEVEL_COLORS[level] || LEVEL_COLORS["Médio"],
+            title: r.title || r.description,
+            status: r.status,
+            probability: p,
+            impact: i,
+            score: p * i,
+            category: r.category || "Geral",
+            responsible: r.responsible || "—",
+            mitigation: r.mitigation || "—",
+            contingency: r.contingency || "—",
+          };
+        }));
       })
       .finally(() => setLoading(false));
   }, [baseUrl]);
@@ -94,7 +115,9 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
   const handleAdd = useCallback(async () => {
     if (!form.title.trim()) return;
     setSaving(true);
-    const level = (form.impact === "Muito Alto" || form.impact === "Alto") ? "Alto" : form.impact === "Muito Baixo" || form.impact === "Baixo" ? "Baixo" : "Médio";
+    const p = form.probability;
+    const i = form.impact;
+    const level = calculateLevel(p, i);
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -107,25 +130,27 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
         mitigation: form.mitigation,
         contingency: form.contingency,
         status: form.status,
-        probability: 3,
-        impact: 3,
+        probability: p,
+        impact: i,
       }),
     });
     const created = await res.json();
     const newRisk: RiskItem = {
       id: created.id,
-      level: created.level,
-      levelColor: LEVEL_COLORS[created.level] || LEVEL_COLORS["Médio"],
+      level,
+      levelColor: LEVEL_COLORS[level] || LEVEL_COLORS["Médio"],
       title: created.title,
       status: created.status,
-      impact: created.level,
+      probability: p,
+      impact: i,
+      score: p * i,
       category: created.category,
       responsible: created.responsible || "—",
       mitigation: created.mitigation || "—",
       contingency: created.contingency || "—",
     };
     setRisks((prev) => [...prev, newRisk]);
-    setForm({ title: "", category: "", description: "", probability: "Média", impact: "Alto", status: "Em Monitoramento", responsible: "", mitigation: "", contingency: "" });
+    setForm({ title: "", category: "", description: "", probability: 3, impact: 3, status: "Em Monitoramento", responsible: "", mitigation: "", contingency: "" });
     setSaving(false);
   }, [baseUrl, form]);
 
@@ -139,7 +164,7 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
       title: risk.title,
       category: risk.category,
       description: "",
-      probability: "Média",
+      probability: risk.probability,
       impact: risk.impact,
       status: risk.status,
       responsible: risk.responsible === "—" ? "" : risk.responsible,
@@ -152,7 +177,9 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
   const handleEditSave = useCallback(async () => {
     if (!editingRisk) return;
     setSavingEdit(true);
-    const level = (editForm.impact === "Muito Alto" || editForm.impact === "Alto") ? "Alto" : editForm.impact === "Muito Baixo" || editForm.impact === "Baixo" ? "Baixo" : "Médio";
+    const p = editForm.probability;
+    const i = editForm.impact;
+    const level = calculateLevel(p, i);
     try {
       const res = await fetch(baseUrl, {
         method: "PATCH",
@@ -166,6 +193,8 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
           mitigation: editForm.mitigation || null,
           contingency: editForm.contingency || null,
           status: editForm.status,
+          probability: p,
+          impact: i,
         }),
       });
       if (!res.ok) throw new Error();
@@ -173,10 +202,12 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
       setRisks((prev) => prev.map((r) => r.id === editingRisk.id ? {
         ...r,
         title: updated.title,
-        level: updated.level,
-        levelColor: LEVEL_COLORS[updated.level] || LEVEL_COLORS["Médio"],
+        level,
+        levelColor: LEVEL_COLORS[level] || LEVEL_COLORS["Médio"],
         status: updated.status,
-        impact: updated.level,
+        probability: p,
+        impact: i,
+        score: p * i,
         category: updated.category || "Geral",
         responsible: updated.responsible || "—",
         mitigation: updated.mitigation || "—",
@@ -211,6 +242,7 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
         impact: Number(s.impact) || 3,
         category: String(s.category || "Geral"),
         mitigation: String(s.mitigation || ""),
+        contingency: String(s.contingency || ""),
       })));
     } catch {
       toast.error("Erro ao gerar sugestões de riscos com IA.");
@@ -221,7 +253,9 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
 
   const handleAcceptSuggestion = async (suggestion: typeof suggestedRisks[0]) => {
     setSuggestedRisks((prev) => prev.filter((s) => s !== suggestion));
-    const level = suggestion.impact >= 4 ? "Alto" : suggestion.impact <= 2 ? "Baixo" : "Médio";
+    const p = suggestion.probability;
+    const i = suggestion.impact;
+    const level = calculateLevel(p, i);
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -231,19 +265,22 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
         level,
         category: suggestion.category || "Geral",
         mitigation: suggestion.mitigation,
+        contingency: suggestion.contingency || "",
         status: "Identificado",
-        probability: suggestion.probability,
-        impact: suggestion.impact,
+        probability: p,
+        impact: i,
       }),
     });
     const created = await res.json();
     setRisks((prev) => [...prev, {
       id: created.id,
-      level: created.level,
-      levelColor: LEVEL_COLORS[created.level] || LEVEL_COLORS["Médio"],
+      level,
+      levelColor: LEVEL_COLORS[level] || LEVEL_COLORS["Médio"],
       title: created.title,
       status: created.status,
-      impact: created.level,
+      probability: p,
+      impact: i,
+      score: p * i,
       category: created.category || "Geral",
       responsible: created.responsible || "—",
       mitigation: created.mitigation || "—",
@@ -396,7 +433,7 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">{risk.title}</h3>
                 <div className="grid grid-cols-2 gap-y-2 text-sm mb-4">
                   <p className="text-slate-500 dark:text-slate-400"><span className="font-semibold text-slate-700 dark:text-slate-300">Status:</span> {risk.status}</p>
-                  <p className="text-slate-500 dark:text-slate-400"><span className="font-semibold text-slate-700 dark:text-slate-300">Impacto:</span> {risk.impact}</p>
+                  <p className="text-slate-500 dark:text-slate-400"><span className="font-semibold text-slate-700 dark:text-slate-300">Score:</span> {risk.score} ({PROB_LABELS[risk.probability]}/{IMPACT_LABELS[risk.impact]})</p>
                   <p className="text-slate-500 dark:text-slate-400"><span className="font-semibold text-slate-700 dark:text-slate-300">Categoria:</span> {risk.category}</p>
                   <p className="text-slate-500 dark:text-slate-400"><span className="font-semibold text-slate-700 dark:text-slate-300">Responsável:</span> {risk.responsible}</p>
                 </div>
@@ -462,29 +499,29 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Probabilidade</label>
               <select
                 value={form.probability}
-                onChange={(e) => setForm({ ...form, probability: e.target.value })}
+                onChange={(e) => setForm({ ...form, probability: Number(e.target.value) })}
                 className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500 px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300"
               >
-                <option value="Muito Baixa">Muito Baixa</option>
-                <option value="Baixa">Baixa</option>
-                <option value="Média">Média</option>
-                <option value="Alta">Alta</option>
-                <option value="Muito Alta">Muito Alta</option>
+                <option value={1}>1 — Muito Baixa</option>
+                <option value={2}>2 — Baixa</option>
+                <option value={3}>3 — Média</option>
+                <option value={4}>4 — Alta</option>
+                <option value={5}>5 — Muito Alta</option>
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Impacto</label>
               <select
                 value={form.impact}
-                onChange={(e) => setForm({ ...form, impact: e.target.value })}
+                onChange={(e) => setForm({ ...form, impact: Number(e.target.value) })}
                 className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500 px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300"
               >
-                <option value="Muito Baixo">Muito Baixo</option>
-                <option value="Baixo">Baixo</option>
-                <option value="Médio">Médio</option>
-                <option value="Alto">Alto</option>
-                <option value="Muito Alto">Muito Alto</option>
+                <option value={1}>1 — Muito Baixo</option>
+                <option value={2}>2 — Baixo</option>
+                <option value={3}>3 — Médio</option>
+                <option value={4}>4 — Alto</option>
+                <option value={5}>5 — Muito Alto</option>
               </select>
             </div>
             
@@ -565,13 +602,23 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
               <input type="text" value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-50 px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all" />
             </div>
             <div>
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Probabilidade</label>
+              <select value={editForm.probability} onChange={(e) => setEditForm({ ...editForm, probability: Number(e.target.value) })} className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-50 px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all">
+                <option value={1}>1 — Muito Baixa</option>
+                <option value={2}>2 — Baixa</option>
+                <option value={3}>3 — Média</option>
+                <option value={4}>4 — Alta</option>
+                <option value={5}>5 — Muito Alta</option>
+              </select>
+            </div>
+            <div>
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Impacto</label>
-              <select value={editForm.impact} onChange={(e) => setEditForm({ ...editForm, impact: e.target.value })} className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-50 px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all">
-                <option value="Muito Baixo">Muito Baixo</option>
-                <option value="Baixo">Baixo</option>
-                <option value="Médio">Médio</option>
-                <option value="Alto">Alto</option>
-                <option value="Muito Alto">Muito Alto</option>
+              <select value={editForm.impact} onChange={(e) => setEditForm({ ...editForm, impact: Number(e.target.value) })} className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-50 px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all">
+                <option value={1}>1 — Muito Baixo</option>
+                <option value={2}>2 — Baixo</option>
+                <option value={3}>3 — Médio</option>
+                <option value={4}>4 — Alto</option>
+                <option value={5}>5 — Muito Alto</option>
               </select>
             </div>
             <div>

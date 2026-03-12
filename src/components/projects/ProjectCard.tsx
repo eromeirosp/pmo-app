@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { User, Calendar, DollarSign, Building2 } from "lucide-react";
+import { parseLocalDate } from "@/lib/utils";
 
 interface EAPItemSlim {
     id: string;
@@ -43,7 +44,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
     const progressPct = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
 
     const formattedEndDate = project.endDate
-        ? new Intl.DateTimeFormat('pt-BR', { month: 'short', year: 'numeric' }).format(new Date(project.endDate))
+        ? new Intl.DateTimeFormat('pt-BR', { month: 'short', year: 'numeric' }).format(parseLocalDate(project.endDate))
         : "Sem prazo";
 
     return (

@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Project, Risk } from "@prisma/client";
+import { parseLocalDate } from "@/lib/utils";
 import {
   FileText, Lightbulb, CheckCircle2, Trash2, Plus,
-  Package, Pin, Ban, AlertTriangle, Save, Loader2, Sparkles, X
+  Package, Pin, Ban, AlertTriangle, Loader2, Sparkles, X
 } from "lucide-react";
 import { TabHeader } from "./TabHeader";
 import { toast } from "sonner";
@@ -222,14 +223,7 @@ export function ProjectCharterTab({ project, saveTrigger }: ProjectCharterTabPro
           icon={FileText}
           title="Termo de Abertura (Project Charter)"
           description="Documento formal que autoriza o projeto e define escopo inicial."
-          actions={
-            <button
-              onClick={() => toast.success("Termo de Abertura salvo com sucesso!")}
-              className="flex items-center gap-2 rounded-xl h-10 px-4 bg-primary text-white font-medium text-sm hover:bg-primary/90 transition-all active:scale-[0.98] cursor-pointer"
-            >
-              <Save className="w-4 h-4" /> Salvar
-            </button>
-          }
+          actions={null}
         />
       </div>
 
@@ -247,13 +241,13 @@ export function ProjectCharterTab({ project, saveTrigger }: ProjectCharterTabPro
           <div>
             <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Início</p>
             <p className="font-semibold text-slate-900 dark:text-white text-sm">
-              {(project as any).startDate ? new Date((project as any).startDate).toLocaleDateString("pt-BR") : "—"}
+              {(project as any).startDate ? parseLocalDate((project as any).startDate).toLocaleDateString("pt-BR") : "—"}
             </p>
           </div>
           <div>
             <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Término</p>
             <p className="font-semibold text-slate-900 dark:text-white text-sm">
-              {(project as any).endDate ? new Date((project as any).endDate).toLocaleDateString("pt-BR") : "—"}
+              {(project as any).endDate ? parseLocalDate((project as any).endDate).toLocaleDateString("pt-BR") : "—"}
             </p>
           </div>
         </div>

@@ -21,8 +21,8 @@ export async function POST(req: NextRequest) {
                 });
 
                 // Notification Logic: Alert if a risk occurred
-                if (newStatus === "OCCURRED") {
-                    console.log(`[ALERT] RISK OCCURRED! The risk "${updatedRisk.description}" has materialized in project ${payload.projectId}.`);
+                if (newStatus === "Ocorrido") {
+                    console.log(`[ALERT] Risco ocorrido! "${updatedRisk.description}" materializou no projeto ${payload.projectId}.`);
 
                     // Update the project status to RED automatically
                     await prisma.project.update({

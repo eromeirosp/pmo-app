@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from 'react';
+import { parseLocalDate } from "@/lib/utils";
 import {
   Download,
   Plus,
@@ -15,6 +16,7 @@ import {
   Loader2,
   Trash2,
   Sparkles,
+  Info,
 } from 'lucide-react';
 import { TabHeader } from "./TabHeader";
 import { toast } from "sonner";
@@ -242,7 +244,7 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
         report.overallStatus,
         report.progress + "%",
         new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(report.budgetSpent || 0),
-        report.reportDate ? new Date(report.reportDate).toLocaleDateString('pt-BR') : "—"
+        report.reportDate ? parseLocalDate(report.reportDate).toLocaleDateString('pt-BR') : "—"
       ]);
 
       autoTable(doc, {
@@ -288,7 +290,7 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
   };
 
   const formatDate = (dateStr: string) => {
-    return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(dateStr));
+    return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(parseLocalDate(dateStr));
   };
 
   const latest = reports[0];
@@ -659,6 +661,10 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
                   Sugerir com IA
                 </button>
               </div>
+              <p className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 -mt-4">
+                <Info className="h-3.5 w-3.5 shrink-0" />
+                A IA utiliza apenas dados já salvos. Salve o relatório antes de pedir sugestões.
+              </p>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
                   Realizações no Período
