@@ -84,9 +84,9 @@ export default function ProjectDetailsPage() {
         <div className="mt-2">
           {activeTab === "informacoes" && <ProjectInfoTab project={project} saveTrigger={saveTrigger} />}
           {activeTab === "pre-projeto" && <ProjectPreProjectTab project={project} saveTrigger={saveTrigger} />}
-          {activeTab === "termo-abertura" && <ProjectCharterTab project={project} saveTrigger={saveTrigger} />}
+          {activeTab === "termo-abertura" && <ProjectCharterTab project={project} saveTrigger={saveTrigger} onApprovalChange={fetchProject} />}
           {activeTab === "matriz-risco" && <ProjectRiskTab project={project} />}
-          {activeTab === "eap" && <ProjectEapTab projectId={project.id} />}
+          {activeTab === "eap" && <ProjectEapTab projectId={project.id} charterApproved={project.charterApproved} />}
           {activeTab === "status-report" && <ProjectStatusReportTab projectId={project.id} />}
           {activeTab === "encerramento" && <ProjectEncerramentoTab projectId={project.id} />}
           

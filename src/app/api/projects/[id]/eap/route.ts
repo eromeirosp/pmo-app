@@ -27,11 +27,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { name, description, parentId, status, order } = await req.json();
     if (!name?.trim()) return NextResponse.json({ error: "Nome obrigatório" }, { status: 400 });
 
-    // If no order provided, put it at the end
+    // If no order provided, put it at the end of its sibling group
     let finalOrder = order;
     if (order === undefined) {
       const lastItem = await prisma.eAPItem.findFirst({
-        where: { projectId: id },
+        where: { projectId: id, parentId: parentId || null },
         orderBy: { order: "desc" },
       });
       finalOrder = (lastItem?.order || 0) + 1000;
@@ -96,6 +96,15 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const itemId = new URL(req.url).searchParams.get("itemId");
   if (!itemId) return NextResponse.json({ error: "itemId obrigatório" }, { status: 400 });
+
+  // Prevent deleting if it has children
+  const childrenCount = await prisma.eAPItem.count({
+    where: { projectId: id, parentId: itemId }
+  });
+
+  if (childrenCount > 0) {
+    return NextResponse.json({ error: "Não é possível excluir um item que possui sub-itens. Exclua os sub-itens primeiro." }, { status: 400 });
+  }
 
   await prisma.eAPItem.delete({ where: { id: itemId, projectId: id } });
   return NextResponse.json({ ok: true });

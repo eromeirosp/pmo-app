@@ -8,34 +8,36 @@ datasource db {
 }
 
 model Project {
-  id               String           @id @default(uuid())
-  name             String
-  manager          String
-  budget           Float
-  stakeholders     String?
-  status           String           @default("GREEN")
-  classification   String?
-  problems         String?
-  returns          String?
-  impacts              String?
-  preliminaryTimeline  String?
-  milestones           String?
-  successCriteria      String?
-  createdAt            DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  department       String?
-  description      String?
-  endDate          DateTime?
-  startDate        DateTime?
-  artifacts        Artifact[]
-  charterItems     CharterItem[]
-  closingItems     ClosingItem[]
-  eapItems         EAPItem[]
-  objectives       Objective[]
-  versions         ProjectVersion[]
-  risks            Risk[]
-  stakeholdersList Stakeholder[]
-  statusReports    StatusReport[]
+  id                  String           @id @default(uuid())
+  name                String
+  manager             String
+  budget              Float
+  stakeholders        String?
+  status              String           @default("GREEN")
+  classification      String?
+  problems            String?
+  returns             String?
+  impacts             String?
+  preliminaryTimeline String?
+  milestones          String?
+  successCriteria     String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  charterApproved     Boolean          @default(false)
+  charterApprovedAt   DateTime?
+  department          String?
+  description         String?
+  endDate             DateTime?
+  startDate           DateTime?
+  artifacts           Artifact[]
+  charterItems        CharterItem[]
+  closingItems        ClosingItem[]
+  eapItems            EAPItem[]
+  objectives          Objective[]
+  versions            ProjectVersion[]
+  risks               Risk[]
+  stakeholdersList    Stakeholder[]
+  statusReports       StatusReport[]
 }
 
 model Objective {

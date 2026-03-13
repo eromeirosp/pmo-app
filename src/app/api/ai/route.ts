@@ -60,14 +60,14 @@ Retorne apenas o JSON, sem marcações markdown ou texto antes/depois.`;
         let response;
         try {
             response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-2.5-pro',
                 contents: prompt,
             });
         } catch (apiError) {
             const err = apiError as Error;
-            console.warn('Fallback triggered: gemini-2.5-flash failed.', err.message || err);
+            console.warn('Fallback triggered: gemini-2.5-pro failed.', err.message || err);
             response = await ai.models.generateContent({
-                model: 'gemini-2.5-pro',
+                model: 'gemini-2.5-flash',
                 contents: prompt,
             });
         }
