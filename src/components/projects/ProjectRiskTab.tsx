@@ -73,15 +73,25 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
   useEffect(() => {
     fetch(baseUrl)
       .then((r) => r.json())
-      .then((data: any[]) => {
+      .then((data: Array<{
+        id: string;
+        level?: string;
+        title?: string;
+        description?: string;
+        status: string;
+        category?: string;
+        responsible?: string;
+        mitigation?: string;
+        contingency?: string;
+      }>) => {
         if (!Array.isArray(data)) return;
         setRisks(data.map((r) => ({
           id: r.id,
           level: r.level || "Médio",
-          levelColor: LEVEL_COLORS[r.level] || LEVEL_COLORS["Médio"],
-          title: r.title || r.description,
+          levelColor: r.level ? LEVEL_COLORS[r.level] || LEVEL_COLORS["Médio"] : LEVEL_COLORS["Médio"],
+          title: r.title || r.description || "Risco",
           status: r.status,
-          impact: r.level,
+          impact: r.level || "Médio",
           category: r.category || "Geral",
           responsible: r.responsible || "—",
           mitigation: r.mitigation || "—",
@@ -204,7 +214,7 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
       const data = await res.json();
       const raw = data.suggestions || [];
       // Validate each suggestion has required fields
-      setSuggestedRisks(raw.filter((s: any) => s && typeof s === "object" && s.title).map((s: any) => ({
+      setSuggestedRisks(raw.filter((s: Record<string, unknown>) => s && typeof s === "object" && s.title).map((s: Record<string, unknown>) => ({
         title: String(s.title || ""),
         description: String(s.description || ""),
         probability: Number(s.probability) || 3,

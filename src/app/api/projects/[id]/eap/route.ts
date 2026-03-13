@@ -14,9 +14,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
       ],
     });
     return NextResponse.json(items);
-  } catch (error: any) {
-    console.error("EAP GET Error:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+  } catch (error) {
+    const err = error as Error;
+    console.error("EAP GET Error:", err);
+    return NextResponse.json({ error: err.message || "Internal Server Error" }, { status: 500 });
   }
 }
 
@@ -47,9 +48,10 @@ export async function POST(req: NextRequest, { params }: Params) {
       },
     });
     return NextResponse.json(item, { status: 201 });
-  } catch (error: any) {
-    console.error("EAP POST Error:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+  } catch (error) {
+    const err = error as Error;
+    console.error("EAP POST Error:", err);
+    return NextResponse.json({ error: err.message || "Internal Server Error" }, { status: 500 });
   }
 }
 

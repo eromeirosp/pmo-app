@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             return NextResponse.json({ error: "ID do projeto não fornecido" }, { status: 400 });
         }
 
-        const updateData: any = {
+        const updateData: Record<string, string | number | Date | undefined> = {
             name: data.name,
             description: data.description,
             manager: data.manager,

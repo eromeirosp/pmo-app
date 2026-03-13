@@ -247,13 +247,13 @@ export function ProjectCharterTab({ project, saveTrigger }: ProjectCharterTabPro
           <div>
             <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Início</p>
             <p className="font-semibold text-slate-900 dark:text-white text-sm">
-              {(project as any).startDate ? new Date((project as any).startDate).toLocaleDateString("pt-BR") : "—"}
+              {(project as { startDate?: string | Date }).startDate ? new Date((project as { startDate?: string | Date }).startDate as string | Date).toLocaleDateString("pt-BR") : "—"}
             </p>
           </div>
           <div>
             <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Término</p>
             <p className="font-semibold text-slate-900 dark:text-white text-sm">
-              {(project as any).endDate ? new Date((project as any).endDate).toLocaleDateString("pt-BR") : "—"}
+              {(project as { endDate?: string | Date }).endDate ? new Date((project as { endDate?: string | Date }).endDate as string | Date).toLocaleDateString("pt-BR") : "—"}
             </p>
           </div>
         </div>
