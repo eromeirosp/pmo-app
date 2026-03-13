@@ -1,8 +1,8 @@
 # PMO-APP — Arquivo Direcionador Universal
 
 > Este documento serve como fonte de verdade para qualquer LLM, dev ou colaborador que trabalhe neste projeto.
-> Sempre consulte este arquivo antes de tomar decisões de implementacao.
-> Ultima atualizacao: 2026-03-11
+> Sempre consulte este arquivo antes de tomar decisoes de implementacao.
+> Ultima atualizacao: 2026-03-12
 
 ---
 
@@ -37,14 +37,16 @@ Sistema guiado para geracao automatica da documentacao padrao de projetos tradic
 | Styling | Tailwind CSS | 4.x |
 | Componentes UI | shadcn/ui (Radix UI) | via radix-ui 1.4.3 |
 | Animacoes | Framer Motion | 12.34.4 |
+| Graficos | Recharts | 3.8.0 |
 | ORM | Prisma | 5.22.0 |
 | Banco de dados | PostgreSQL | via Neon.tech (free tier) |
 | IA/LLM | Google Gemini | via @google/genai 1.43.0 |
+| PDF Export | jsPDF + jsPDF-autotable | 4.2.0 / 5.0.7 |
 | Icones | Lucide React | 0.576.0 |
 | Toasts | Sonner | 2.0.7 |
 | Temas | next-themes | 0.4.6 |
 | Auth (futuro) | NextAuth.js | a implementar |
-| Deploy (futuro) | Vercel | a implementar |
+| Deploy | Vercel | configurado |
 
 **Path alias:** `@/*` aponta para `./src/*`
 
@@ -55,132 +57,127 @@ Sistema guiado para geracao automatica da documentacao padrao de projetos tradic
 ```
 pmo-app/
 ├── prisma/
-│   └── schema.prisma                          # Modelos: Project, Artifact, ProjectVersion, EAPItem, Risk, StatusReport
+│   ├── schema.prisma              # 10 modelos + AuditLog
+│   ├── seed.ts                    # Dados demo (3 projetos realistas)
+│   └── seed-self.ts               # Seed alternativo
 ├── src/
 │   ├── app/
-│   │   ├── layout.tsx                          # Layout raiz (Toaster, font Inter, lang pt-BR)
-│   │   ├── page.tsx                            # Dashboard — listagem de projetos com busca
-│   │   ├── globals.css                         # Tailwind + variaveis de tema (OKLch)
+│   │   ├── layout.tsx             # Layout raiz (Toaster, Inter, tema, lang pt-BR)
+│   │   ├── page.tsx               # Dashboard — KPIs, graficos, busca, filtros
+│   │   ├── globals.css            # Tailwind + variaveis de tema (OKLch)
+│   │   ├── error.tsx              # Error boundary global
+│   │   ├── loading.tsx            # Loading state global
+│   │   ├── not-found.tsx          # Pagina 404
 │   │   ├── projects/
-│   │   │   ├── new/page.tsx                    # Formulario de criacao (7 perguntas + IA)
-│   │   │   └── [id]/documents/page.tsx         # Central de documentos (3 abas: Business Case, Escopo, Riscos)
+│   │   │   ├── new/page.tsx       # Formulario de criacao (7 perguntas + IA)
+│   │   │   └── [id]/
+│   │   │       ├── page.tsx       # Pagina de projeto com 7 abas
+│   │   │       └── documents/page.tsx # Central de documentos (legado)
 │   │   └── api/
-│   │       ├── projects/route.ts               # GET (busca) + POST (criacao com IA + artefatos)
-│   │       ├── projects/[id]/route.ts          # GET projeto individual com artifacts, risks, versions
-│   │       ├── ai/route.ts                     # POST analise IA (Gemini) — gera classificacao, business case, escopo, riscos
-│   │       ├── artifacts/route.ts              # PUT atualizacao com auto-versionamento (snapshot antes de salvar)
-│   │       ├── cron/route.ts                   # GET alertas (projetos parados >7 dias, riscos materializados)
-│   │       └── webhooks/route.ts               # POST integracao externa Jira/DevOps (futuro)
+│   │       ├── projects/route.ts               # GET lista + POST criacao com IA
+│   │       ├── projects/[id]/route.ts           # GET/PATCH/DELETE projeto
+│   │       ├── projects/[id]/objectives/route.ts
+│   │       ├── projects/[id]/stakeholders/route.ts
+│   │       ├── projects/[id]/charter/route.ts
+│   │       ├── projects/[id]/eap/route.ts
+│   │       ├── projects/[id]/risks/route.ts
+│   │       ├── projects/[id]/status-reports/route.ts
+│   │       ├── projects/[id]/closing/route.ts
+│   │       ├── projects/[id]/audit-logs/route.ts
+│   │       ├── projects/stats/route.ts          # KPIs do dashboard
+│   │       ├── ai/route.ts                      # Analise IA principal (Gemini)
+│   │       ├── ai/suggest/route.ts              # Sugestoes contextuais IA
+│   │       ├── artifacts/route.ts               # CRUD artefatos com versionamento
+│   │       ├── cron/route.ts                    # Alertas automaticos (stub)
+│   │       └── webhooks/route.ts                # Integracoes externas (stub)
 │   ├── components/
 │   │   ├── layout/
-│   │   │   └── Topbar.tsx                      # Header fixo com navegacao e branding
+│   │   │   ├── Topbar.tsx
+│   │   │   └── ThemeToggle.tsx
 │   │   ├── projects/
-│   │   │   └── ProjectCard.tsx                 # Card de projeto (nome, gerente, orcamento, status, classificacao)
-│   │   └── ui/                                 # 10 componentes shadcn/ui: badge, button, card, input, label, select, skeleton, sonner, textarea
+│   │   │   ├── ProjectCard.tsx
+│   │   │   ├── ProjectHeader.tsx
+│   │   │   ├── ProjectTabs.tsx
+│   │   │   ├── TabHeader.tsx
+│   │   │   ├── ProjectInfoTab.tsx
+│   │   │   ├── ProjectPreProjectTab.tsx
+│   │   │   ├── ProjectCharterTab.tsx
+│   │   │   ├── ProjectEapTab.tsx
+│   │   │   ├── ProjectRiskTab.tsx
+│   │   │   ├── ProjectStatusReportTab.tsx
+│   │   │   ├── ProjectEncerramentoTab.tsx
+│   │   │   ├── CreateProjectModal.tsx
+│   │   │   └── ProjectAuditModal.tsx
+│   │   ├── dashboard/
+│   │   │   ├── StatsKPIRow.tsx
+│   │   │   ├── StatusDonutChart.tsx
+│   │   │   ├── BudgetBarChart.tsx
+│   │   │   └── ProjectsAreaChart.tsx
+│   │   ├── theme-provider.tsx
+│   │   └── ui/                    # 13+ componentes shadcn/ui
 │   └── lib/
-│       ├── prisma.ts                           # Singleton do Prisma Client (previne multiplas instancias em dev)
-│       └── utils.ts                            # Utilitario cn() para classes condicionais (clsx + tailwind-merge)
+│       ├── prisma.ts              # Singleton Prisma Client
+│       ├── utils.ts               # cn() + parseLocalDate()
+│       └── audit.ts               # Funcao de audit logging
+├── public/
+├── .env.example
 ├── package.json
 ├── tsconfig.json
-├── next.config.ts                              # Vazio (defaults do Next.js)
-└── components.json                             # Config do shadcn/ui
+├── tailwind.config.ts
+├── next.config.ts
+├── components.json
+├── README.md
+└── ROADMAP.md
 ```
 
 ---
 
-## 4. MODELO DE DADOS (PRISMA)
+## 4. MODELO DE DADOS (PRISMA) — 10 TABELAS + AUDITLOG
 
 ```prisma
 model Project {
-  id             String           @id @default(uuid())
-  name           String
-  manager        String
-  budget         Float
-  stakeholders   String?
-  status         String           @default("GREEN")        // GREEN | YELLOW | RED
-  classification String?                                    // TRADITIONAL | AGILE | HYBRID
-  problems       String?
-  returns        String?
-  impacts        String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  artifacts      Artifact[]
-  versions       ProjectVersion[]
-  eapItems       EAPItem[]
-  risks          Risk[]
-  statusReports  StatusReport[]
+  id               String           @id @default(uuid())
+  name             String
+  manager          String
+  budget           Float
+  stakeholders     String?
+  status           String           @default("GREEN")        // GREEN | YELLOW | RED
+  classification   String?                                    // TRADITIONAL | AGILE | HYBRID
+  problems         String?
+  returns          String?
+  impacts          String?
+  preliminaryTimeline  String?
+  milestones           String?
+  successCriteria      String?
+  department       String?
+  description      String?
+  startDate        DateTime?
+  endDate          DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  // Relacoes
+  artifacts        Artifact[]
+  charterItems     CharterItem[]
+  closingItems     ClosingItem[]
+  eapItems         EAPItem[]
+  objectives       Objective[]
+  versions         ProjectVersion[]
+  risks            Risk[]
+  stakeholdersList Stakeholder[]
+  statusReports    StatusReport[]
 }
 
-model Artifact {
-  id        String   @id @default(uuid())
-  projectId String
-  type      String   // BUSINESS_CASE | ESCOPO_PRELIMINAR | RISCOS_INICIAIS | DOCUMENT_CENTER
-  content   Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-}
-
-model ProjectVersion {
-  id           String   @id @default(uuid())
-  projectId    String
-  snapshotData Json     // Estado completo dos artefatos em um ponto no tempo
-  createdAt    DateTime @default(now())
-  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-}
-
-model EAPItem {
-  id          String   @id @default(uuid())
-  projectId   String
-  name        String
-  description String?
-  parentId    String?  // Estrutura hierarquica (arvore)
-  status      String   @default("PENDING") // PENDING | IN_PROGRESS | COMPLETED
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-}
-
-model Risk {
-  id          String   @id @default(uuid())
-  projectId   String
-  description String
-  probability Int      // 1-5
-  impact      Int      // 1-5
-  status      String   @default("IDENTIFIED") // IDENTIFIED | MITIGATED | OCCURRED
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-}
-
-model StatusReport {
-  id          String   @id @default(uuid())
-  projectId   String
-  reportDate  DateTime @default(now())
-  summary     String
-  statusColor String   // GREEN | YELLOW | RED
-  nextSteps   String?
-  createdAt   DateTime @default(now())
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-}
+model Objective     { id, projectId, text, order, createdAt }
+model Stakeholder   { id, projectId, name, role, email?, interest, influence, createdAt }
+model CharterItem   { id, projectId, type (CRITERIA|DELIVERABLE|PREMISE|RESTRICTION), text, createdAt }
+model ClosingItem   { id, projectId, type (DELIVERABLE|LESSON|RECOMMENDATION), text, createdAt }
+model Artifact      { id, projectId, type, content (Json), createdAt, updatedAt }
+model ProjectVersion { id, projectId, snapshotData (Json), createdAt }
+model EAPItem       { id, projectId, name, description?, parentId?, status, order (Float), createdAt, updatedAt }
+model Risk          { id, projectId, title, description, probability (Int 1-5), impact (Int 1-5), level, status, category, mitigation?, contingency?, responsible?, createdAt, updatedAt }
+model StatusReport  { id, projectId, period, reportDate, overallStatus, scopeStatus, scheduleStatus, budgetStatus, progress (Float), budgetSpent?, accomplishments?, nextSteps?, issues?, createdAt, updatedAt }
+model AuditLog      { id, projectId, userId?, userName?, action, entity, entityId?, field?, oldValue?, newValue?, createdAt }
 ```
-
-**Modelos futuros a criar:**
-```prisma
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String   // hash bcrypt
-  name      String
-  role      String   @default("USER") // USER | ADMIN
-  createdAt DateTime @default(now())
-  projects  Project[] // relacao via Project.createdBy
-}
-```
-
-**Tipos de Artifact futuros:**
-- `TERMO_ABERTURA` — Documento formal de aprovacao e inicio de execucao
-- `TERMO_ENCERRAMENTO` — Documento de fechamento com licoes aprendidas e aceite
 
 ---
 
@@ -206,7 +203,7 @@ NEXTAUTH_URL="http://localhost:3000"
 npm install
 # Criar arquivo .env com DATABASE_URL e GEMINI_API_KEY
 npx prisma migrate dev
-# (futuro) npx prisma db seed
+npx prisma db seed           # Carrega 3 projetos demo
 npm run dev
 ```
 
@@ -228,12 +225,21 @@ npm run dev
 | AGILE | Metodologia agil |
 | HYBRID | Combinacao de ambas |
 
-### Ciclo de Vida de Risco
-`IDENTIFIED` → `MITIGATED` → `OCCURRED`
-- Se um risco vai para OCCURRED, o status do projeto automaticamente vira RED
+### Scoring de Risco (P x I)
+O risco e classificado pelo score = Probabilidade (1-5) x Impacto (1-5):
+| Score | Nivel |
+|-------|-------|
+| 1-2 | Muito Baixo |
+| 3-4 | Baixo |
+| 5-9 | Medio |
+| 10-15 | Alto |
+| 16-25 | Muito Alto |
+
+### Status de Risco (PT-BR padrao)
+`Identificado` → `Em Monitoramento` → `Ocorrido` | `Encerrado`
 
 ### Status de Itens da EAP
-`PENDING` → `IN_PROGRESS` → `COMPLETED`
+`PENDING` → `IN_PROGRESS` → `DONE`
 
 ### As 7 Perguntas Fundamentais (Iniciacao de Projeto)
 1. Nome do Projeto
@@ -245,56 +251,68 @@ npm run dev
 7. Impactos (o que muda ou quem e afetado)
 
 ### Documentos do Ciclo de Vida do Projeto
-| Documento | Momento | Status no sistema |
-|-----------|---------|------------------|
-| Pre-projeto / Business Case | Antes da aprovacao | Implementado (gerado por IA) |
-| Escopo Preliminar | Informacoes basicas do projeto | Implementado (gerado por IA) |
-| Termo de Abertura | Aprovacao formal, inicio da execucao | A implementar |
-| EAP (Estrutura Analitica) | Planejamento da execucao | Modelo existe, UI nao |
-| Matriz de Risco | Acompanhamento | Parcialmente implementado |
-| Status Report | Acompanhamento periodico | Modelo existe, UI nao |
-| Termo de Encerramento | Fechamento do projeto | A implementar |
+| Documento | Momento | Status |
+|-----------|---------|--------|
+| Pre-projeto / Business Case | Antes da aprovacao | ✅ Implementado (gerado por IA) |
+| Escopo Preliminar | Informacoes basicas | ✅ Implementado (gerado por IA) |
+| Termo de Abertura (Charter) | Aprovacao formal | ✅ Implementado (4 secoes + IA) |
+| EAP (Estrutura Analitica) | Planejamento | ✅ Implementado (lista flat, hierarquia pendente) |
+| Matriz de Risco | Acompanhamento | ✅ Implementado (CRUD + IA + scoring P×I) |
+| Status Report | Acompanhamento periodico | ✅ Implementado (CRUD + IA + PDF) |
+| Termo de Encerramento | Fechamento | ✅ Implementado (3 secoes basicas) |
 
 **IMPORTANTE:** Escopo Preliminar e Termo de Abertura sao documentos DISTINTOS. O escopo contem informacoes basicas. O termo representa a aprovacao formal e marca o inicio da execucao do projeto.
+
+**PRINCIPIO DE IA:** A IA sempre le dados persistidos (banco), nao estado local do formulario. O usuario deve salvar antes de pedir sugestoes.
 
 ---
 
 ## 8. O QUE JA ESTA IMPLEMENTADO
 
-### Funcional e confirmado
-- [x] Dashboard de portfolio com busca por nome (`src/app/page.tsx`)
-- [x] Formulario de criacao com 7 perguntas (`src/app/projects/new/page.tsx`)
-- [x] Analise via IA Gemini: classificacao + business case + escopo + riscos (`src/app/api/ai/route.ts`)
-- [x] Criacao de projeto com artefatos em transacao (`src/app/api/projects/route.ts`)
-- [x] Central de documentos com 3 abas (`src/app/projects/[id]/documents/page.tsx`)
-- [x] Edicao de artefatos com auto-versionamento via snapshot (`src/app/api/artifacts/route.ts`)
+### ✅ Funcional e confirmado
+- [x] Dashboard de portfolio com KPIs, graficos (donut, bar, area), busca, filtros, ordenacao
+- [x] Formulario de criacao com 7 perguntas + analise IA Gemini
+- [x] IA gera: classificacao, business case, escopo, timeline, milestones, criterios de sucesso, riscos iniciais
+- [x] Fallback IA: Gemini 2.5 Flash → 2.5 Pro
+- [x] Pagina de projeto com 7 abas (Info, Pre-Projeto, Charter, EAP, Risco, Status, Encerramento)
+- [x] Aba Informacoes: edicao de metadados do projeto (nome, gerente, orcamento, datas, status, departamento)
+- [x] Aba Pre-Projeto: objetivos CRUD, stakeholders CRUD (nome, papel, email, interesse, influencia), business case, escopo
+- [x] Aba Termo de Abertura: 4 secoes (criterios, entregas, premissas, restricoes) com sugestoes IA
+- [x] Aba EAP: CRUD de itens, reorder, status toggle, PDF export
+- [x] Aba Matriz de Risco: CRUD completo, scoring P×I real, sugestoes IA com contingency
+- [x] Aba Status Report: CRUD, traffic light system, sugestoes narrativas IA, PDF export
+- [x] Aba Encerramento: 3 secoes (entregas, licoes, recomendacoes) com CRUD individual
+- [x] Modal de auditoria: timeline visual de CREATE/UPDATE/DELETE com old/new values
+- [x] Central de documentos com edicao e versionamento (snapshot)
 - [x] Status semaforo com badges coloridos
-- [x] Formatacao em Real (R$) com `Intl.NumberFormat('pt-BR')`
-- [x] Validacao server-side (orcamento alto exige escopo >20 chars)
-- [x] Webhook para riscos externos com cascata automatica de status (`src/app/api/webhooks/route.ts`)
+- [x] Formatacao em Real (R$) com Intl.NumberFormat
+- [x] Dark mode funcional (next-themes + CSS vars)
+- [x] Responsivo (desktop, tablet, mobile)
+- [x] Dados demo: 3 projetos realistas via seed.ts
+- [x] Deploy Vercel configurado (prisma generate + next build)
+- [x] .env.example
+- [x] Paginas de erro (404, 500, error.tsx, loading.tsx)
+- [x] Aviso de "IA le dados salvos" no Status Report
 
-### Parcial / Inacabado
-- [ ] Rollback de versoes — snapshots salvos no banco, mas SEM UI de historico/restauracao
-- [ ] Cron de alertas — logica existe mas apenas loga no console, sem notificacao real
-- [ ] Dark mode — next-themes instalado + CSS vars prontas, mas sem toggle na UI
-- [ ] Gestao de riscos — apenas visualizacao, sem edicao/mitigacao/CRUD
+### ⬜ Incompleto / Precisa evolucao
+- [ ] EAP hierarquica — parentId existe no schema mas nao e usado (lista flat)
+- [ ] Status semaforo e 100% manual — sem componente calculado
+- [ ] Charter sem conceito de "aprovado" como gate para EAP
+- [ ] Caminho critico / dependencias entre atividades — nao existe
+- [ ] Budget tracking — budgetSpent e manual, sem sistema de lancamentos
+- [ ] Versionamento — ProjectVersion existe mas sem UI de historico/rollback
+- [ ] Cron/alertas — logica existe mas so loga no console
+- [ ] Classificacao de projeto via IA — campo e select livre, deveria ser sugestao IA
+- [ ] Encerramento assistido por IA (auto-fill com base no historico)
+- [ ] Acessibilidade — criticidade depende apenas de cor (faltam icones, labels, legendas)
 
-### Ausente (precisa implementar)
+### ⬜ Ausente (precisa implementar)
 - [ ] Autenticacao (email/senha via NextAuth.js)
 - [ ] Modelo User no banco
-- [ ] UI para EAP (WBS) — modelo EAPItem existe no Prisma
-- [ ] UI para Status Reports — modelo StatusReport existe no Prisma
-- [ ] Termo de Abertura (tipo de Artifact)
-- [ ] Termo de Encerramento (tipo de Artifact + fluxo de fechamento)
-- [ ] Filtros e ordenacao no dashboard
-- [ ] Dashboard analitico com KPIs e graficos
+- [ ] Assinatura digital de documentos
 - [ ] Notificacoes push in-app
-- [ ] Deploy em producao
 - [ ] Testes automatizados
-- [ ] CI/CD
-- [ ] .env.example
-- [ ] Seed de dados (prisma/seed.ts)
-- [ ] Paginas de erro (404, 500, error.tsx, loading.tsx)
+- [ ] CI/CD (GitHub Actions)
 
 ---
 
@@ -306,12 +324,12 @@ npm run dev
 | Banco dev | Neon.tech free tier | Nao congela projetos inativos (Supabase congela) |
 | Deploy | Vercel | Sem restricao da AIR por enquanto |
 | IA principal | Gemini 2.5 Flash | Coberto pela API gratuita |
-| IA fallback | Gemini 2.5 Pro | Para quando o modelo principal falhar. NAO pode ser 1.5 (fora da API) |
+| IA fallback | Gemini 2.5 Pro | Para quando o modelo principal falhar |
 | Design | Figma como referencia final | URL: https://www.figma.com/make/Lodp4YbQbtwVNUxD76QTX1/Project-Management-App |
 | Idioma do app | pt-BR hardcoded | Sem necessidade de i18n por enquanto |
-| Notificacoes | Push in-app (toast/badge) | Sem email ou Slack por enquanto |
-| Integracao Jira | Futuro, nao prioridade | Foco em features internas primeiro |
-| @prisma/client | Mover para dependencies | Atualmente esta incorretamente em devDependencies |
+| Status de risco | PT-BR padrao | "Identificado", "Em Monitoramento", "Ocorrido", "Encerrado" |
+| Scoring de risco | P × I numerico | Score = probability(1-5) × impact(1-5), mapeado para 5 niveis |
+| IA e estado | Sempre le banco (persistido) | Usuario deve salvar antes de pedir sugestoes |
 
 ---
 
@@ -327,133 +345,84 @@ npm run dev
 
 ---
 
-## 11. ROADMAP COMPLETO
+## 11. ROADMAP
 
-### FASE 1 — Preparacao para Touchpoint (ate 26/03/2026)
-> Meta: Demo ao vivo, funcional, impressionante. Polir o que existe.
+### FASE 0 — Estabilizacao / Confianca Basica ✅ (Concluida 12/03/2026)
+> Correcoes de bugs e inconsistencias levantadas na reuniao de demo.
 
-| ID | Tarefa | Descricao | Esforco | Status |
-|----|--------|-----------|---------|--------|
-| 1.1 | Setup local independente | Provisionar Neon.tech, .env.local, rodar migrations, criar seed.ts, corrigir @prisma/client | Baixo | A fazer |
-| 1.2 | Fallback de IA | Try/catch no /api/ai com Gemini 2.5 Flash como principal e 2.5 Pro como fallback | Baixo | A fazer |
-| 1.3 | Polir UX do fluxo principal | Loading states elegantes na IA, artefatos bem formatados, responsividade para projetor | Medio | A fazer |
-| 1.4 | Alinhar visual com Figma | Comparar telas atuais com Figma, ajustar cores/espacamentos/tipografia/layout | Medio-Alto | A fazer |
-| 1.5 | Dados de demo convincentes | 3-5 projetos ficticios mas realistas, 1 para criar ao vivo | Baixo | A fazer |
+- [x] Fix data UTC/BRT (off-by-one em datas)
+- [x] Remover botao Salvar fake do Charter
+- [x] Fix contingency nao persistida ao aceitar risco IA
+- [x] Fix scroll do modal de auditoria
+- [x] Normalizar status de risco PT/EN em toda a base de codigo
+- [x] Aviso "IA le dados salvos" no Status Report
+- [x] Scoring de risco P×I real (score numerico + calculo de nivel)
+- [x] Atualizar ROADMAP.md como fonte de verdade
 
----
+### FASE 1 — Correcoes Estruturais de Dominio (2-3 semanas)
+> Modelo de dados e fluxo representam a realidade de PMO.
 
-### FASE 2 — MVP para Producao (27/03 → 26/06/2026)
-> Meta: Sistema em producao, utilizavel de verdade na AIR Company.
+**Decision Gates (precisam de reuniao antes de codar):**
+- [ ] DG-01: Quando EAP nasce formalmente? (Recomendacao: apos Charter aprovado)
+- [ ] DG-02: Modelo de aprovacao do Charter (Recomendacao: campo booleano charterApproved)
+- [ ] DG-03: Como tratar caminho critico vs dependencia? (Recomendacao: dependencias simples primeiro, CPM futuro)
 
-#### Sprint 1: Autenticacao + Deploy (Abril, semanas 1-2)
+**Implementacao:**
+- [ ] EAP hierarquica real (arvore, indent, parent selection, parentId usado)
+- [ ] Charter como gate para EAP (campo charterApproved + UI)
+- [ ] Reformular campo classification → IA sugere, usuario confirma/edita
+- [ ] Status semaforo semi-automatico (calculado + override com justificativa)
+- [ ] Expandir audit trail para Charter, EAP, StatusReport
 
-| ID | Tarefa | Descricao | Esforco |
-|----|--------|-----------|---------|
-| 2.1 | Autenticacao email/senha | NextAuth.js + Credentials, modelo User no Prisma, telas login/registro, middleware de protecao, relacionar Project.createdBy com User.id | Alto |
-| 2.2 | Deploy Vercel | Conectar GitHub → Vercel, env vars, banco Neon como producao | Baixo |
+### FASE 2 — UX/UI e Aderencia Visual (1-2 semanas)
+> Alinhar com Figma, resolver acessibilidade.
 
-#### Sprint 2: EAP + Riscos completo (Abril, semanas 3-4)
+- [ ] Revisao de alinhamento com Figma (todas as telas)
+- [ ] Sistema de icones + labels para status (alem de cor) — acessibilidade
+- [ ] Heatmap visual 5×5 real para matriz de risco
+- [ ] Progress bar calculada a partir de EAP
+- [ ] Legenda visual para estados/criticidade
 
-| ID | Tarefa | Descricao | Esforco |
-|----|--------|-----------|---------|
-| 2.3 | UI para EAP (WBS) | Nova pagina `/projects/[id]/eap`, arvore hierarquica, CRUD EAPItems, status por item | Alto |
-| 2.4 | Gestao de riscos completa | CRUD completo de riscos, matriz visual 5x5, campo de plano de mitigacao | Medio |
+### FASE 3 — IA Util e Confiavel (2-3 semanas)
+> IA agrega valor sem confundir.
 
-**Arquivos a criar:**
-- `src/app/projects/[id]/eap/page.tsx`
-- `src/app/api/eap/route.ts`
+- [ ] Classificacao de projeto via IA com confirmacao do usuario
+- [ ] Encerramento assistido por IA (le status reports, riscos, EAP)
+- [ ] Sanitizacao de input antes do prompt (anti-injection)
+- [ ] Sugestoes de IA para decomposicao de EAP (requer hierarquia)
 
-#### Sprint 3: Status Reports + Notificacoes (Maio, semanas 1-2)
+### FASE 4 — Formalizacao / Maturidade do Produto (3-4 semanas)
+> Autenticacao, governanca, testes, producao.
 
-| ID | Tarefa | Descricao | Esforco |
-|----|--------|-----------|---------|
-| 2.5 | UI para Status Reports | Nova pagina `/projects/[id]/status`, formulario, timeline visual | Medio |
-| 2.6 | Notificacoes push in-app | Badge no Topbar com contador, drawer de notificacoes, integracao com logica do cron | Medio |
-
-**Arquivos a criar:**
-- `src/app/projects/[id]/status/page.tsx`
-- `src/app/api/status-reports/route.ts`
-
-#### Sprint 4: Documentos completos (Maio, semanas 3-4)
-
-| ID | Tarefa | Descricao | Esforco |
-|----|--------|-----------|---------|
-| 2.7 | Termo de Abertura | Novo tipo de Artifact `TERMO_ABERTURA`, template com aprovadores e data de inicio, IA gera rascunho a partir do escopo | Medio |
-| 2.8 | Termo de Encerramento | Novo tipo `TERMO_ENCERRAMENTO`, fluxo de fechamento de projeto, campos de licoes aprendidas e aceite | Medio |
-| 2.9 | Rollback de versoes | UI de historico por artefato, comparacao visual, botao de restaurar | Medio |
-
-#### Sprint 5: Dashboard + Polish (Junho, semanas 1-2)
-
-| ID | Tarefa | Descricao | Esforco |
-|----|--------|-----------|---------|
-| 2.10 | Dashboard analitico | KPIs (total projetos, distribuicao por status, orcamento agregado), graficos com Recharts ou Chart.js | Medio |
-| 2.11 | Filtros e ordenacao | Filtrar por status/classificacao/gerente, ordenar por data/nome/orcamento, persistir na URL | Baixo-Medio |
-
-#### Sprint 6: Hardening (Junho, semanas 3-4)
-
-| ID | Tarefa | Descricao | Esforco |
-|----|--------|-----------|---------|
-| 2.12 | Testes automatizados | Vitest para API routes, Testing Library para componentes criticos | Medio |
-| 2.13 | Seguranca e performance | Migrar listagens para Server Components, validacao de inputs, rate limiting | Medio |
+- [ ] Autenticacao (NextAuth + Credentials)
+- [ ] DG: Modelo de assinatura digital (Recomendacao: checkbox + timestamp + nome para MVP)
+- [ ] Assinatura simbolica de Charter e Encerramento
+- [ ] Fluxo de encerramento completo com checklist e aceite
+- [ ] Testes automatizados (Vitest + Testing Library)
+- [ ] CI/CD + Deploy Vercel finalizado
 
 ---
 
-## 12. MAPA DE ARQUIVOS CRITICOS
-
-### Arquivos existentes que precisam de modificacao
-
-| Arquivo | Modificacoes necessarias |
-|---------|------------------------|
-| `prisma/schema.prisma` | Adicionar model User, novos tipos de Artifact (TERMO_ABERTURA, TERMO_ENCERRAMENTO) |
-| `package.json` | Mover @prisma/client de devDependencies para dependencies |
-| `src/app/api/ai/route.ts` | Adicionar fallback Gemini 2.5 Pro |
-| `src/app/api/projects/route.ts` | Relacionar projeto com User (apos auth) |
-| `src/app/page.tsx` | Polir dashboard, adicionar filtros, alinhar com Figma |
-| `src/app/projects/new/page.tsx` | Melhorar loading states da IA, polir UX |
-| `src/app/projects/[id]/documents/page.tsx` | Polir artefatos, alinhar com Figma, expandir riscos |
-| `src/components/layout/Topbar.tsx` | Alinhar com Figma, adicionar badge de notificacoes (futuro) |
-| `src/components/projects/ProjectCard.tsx` | Alinhar com Figma |
-
-### Novos arquivos a criar
-
-| Arquivo | Fase | Descricao |
-|---------|------|-----------|
-| `.env.example` | 1.1 | Template de variaveis de ambiente |
-| `prisma/seed.ts` | 1.1 | Dados de demonstracao |
-| `src/app/loading.tsx` | 1.3 | Loading state global |
-| `src/app/error.tsx` | 1.3 | Error boundary global |
-| `src/app/not-found.tsx` | 1.3 | Pagina 404 |
-| `src/app/login/page.tsx` | 2.1 | Tela de login |
-| `src/app/register/page.tsx` | 2.1 | Tela de registro |
-| `src/middleware.ts` | 2.1 | Protecao de rotas (NextAuth) |
-| `src/app/projects/[id]/eap/page.tsx` | 2.3 | UI da EAP (WBS) |
-| `src/app/api/eap/route.ts` | 2.3 | CRUD EAPItems |
-| `src/app/projects/[id]/status/page.tsx` | 2.5 | UI dos Status Reports |
-| `src/app/api/status-reports/route.ts` | 2.5 | CRUD StatusReports |
-| `src/app/api/notifications/route.ts` | 2.6 | API de notificacoes |
-
----
-
-## 13. PADROES E CONVENCOES A SEGUIR
+## 12. PADROES E CONVENCOES
 
 ### Codigo
-- TypeScript strict mode (ja configurado)
+- TypeScript strict mode
 - Path alias: `@/` = `./src/`
-- Componentes UI via shadcn/ui (instalados com `npx shadcn add`)
-- Classes CSS via Tailwind com `cn()` helper para condicionais
+- Componentes UI via shadcn/ui
+- Classes CSS via Tailwind com `cn()` helper
 - Prisma Client via singleton em `@/lib/prisma`
-- Tipos vindos de `@prisma/client` (nao criar interfaces duplicadas)
-- API routes no padrao Next.js App Router (`route.ts` com funcoes GET/POST/PUT/DELETE exportadas)
-- IDs sao UUID v4 (gerados pelo Prisma com `@default(uuid())`)
-- Datas gerenciadas pelo Prisma (`@default(now())` e `@updatedAt`)
+- Datas: usar `parseLocalDate()` de `@/lib/utils` para evitar bug UTC
+- Status de risco: sempre em PT-BR ("Identificado", "Em Monitoramento", "Ocorrido", "Encerrado")
+- API routes no padrao Next.js App Router
+- IDs sao UUID v4
 
 ### UI/UX
 - Idioma: pt-BR
 - Moeda: Real (R$) com `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })`
 - Status visual: semaforo (GREEN=emerald, YELLOW=amber, RED=rose)
 - Toasts via Sonner para feedback de acoes
-- Design de referencia: Figma (link na secao 9)
-- Font: Inter (ja configurada no layout.tsx)
+- Design de referencia: Figma
+- Font: Inter
 
 ### Git
 - Trabalhar em branches, nao commitar direto na master
@@ -462,34 +431,7 @@ npm run dev
 
 ---
 
-## 14. CRITERIOS DE VERIFICACAO
-
-### Para o Touchpoint (26/03)
-- [ ] `npm run dev` sobe sem erros
-- [ ] Dashboard lista projetos com visual proximo ao Figma
-- [ ] Criar projeto: 7 perguntas → IA processa → 3 artefatos gerados
-- [ ] Se IA principal falhar → fallback funciona e usuario e informado
-- [ ] Central de documentos: editar artefato → salvar → snapshot criado
-- [ ] Responsivo em tela de projetor/TV (1920px+)
-- [ ] Dados de demo realistas e convincentes
-
-### Para Producao (26/06)
-- [ ] Login com email/senha funciona
-- [ ] Rotas protegidas (sem auth = redirect para login)
-- [ ] EAP: criar arvore hierarquica, mudar status de itens
-- [ ] Riscos: CRUD completo, matriz visual probabilidade x impacto
-- [ ] Status Reports: criar, visualizar timeline
-- [ ] Termo de Abertura: gerar a partir do escopo
-- [ ] Termo de Encerramento: fluxo de fechamento
-- [ ] Notificacoes: badge aparece quando ha alertas
-- [ ] Dashboard analitico com KPIs
-- [ ] Filtros no dashboard (status, classificacao, gerente)
-- [ ] Deploy Vercel funcional com banco Neon
-- [ ] Testes nos fluxos core
-
----
-
-## 15. TIME E COMUNICACAO
+## 13. TIME E COMUNICACAO
 
 | Pessoa | Papel | Contato |
 |--------|-------|---------|
@@ -503,13 +445,12 @@ npm run dev
 
 ---
 
-## 16. RISCOS CONHECIDOS
+## 14. RISCOS CONHECIDOS
 
 | Risco | Severidade | Mitigacao |
 |-------|-----------|-----------|
-| Chave Gemini pessoal (quota) | Critico | Implementar fallback com segundo modelo |
-| Banco so na maquina do Eduardo | Alto | Provisionar Neon.tech |
-| Zero testes | Alto (para producao) | Adicionar Vitest no Sprint 6 |
-| Sem autenticacao | Critico (para producao) | NextAuth.js no Sprint 1 da Fase 2 |
-| @prisma/client em devDependencies | Baixo | Mover para dependencies |
-| Todas as paginas "use client" | Baixo | Migrar para Server Components no Sprint 6 |
+| Chave Gemini pessoal (quota) | Critico | Fallback Flash → Pro implementado |
+| Zero testes | Alto (para producao) | Adicionar Vitest na Fase 4 |
+| Sem autenticacao | Critico (para producao) | NextAuth.js na Fase 4 |
+| EAP flat (sem hierarquia) | Alto (para dominio) | Implementar na Fase 1 |
+| Status 100% manual | Medio | Semi-automatico na Fase 1 |

@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest) {
         // 2. Alert: Risk Occurred Check
         // This is handled real-time in the webhook, but we log the current list
         const materialisedRisks = await prisma.risk.findMany({
-            where: { status: "OCCURRED" },
+            where: { status: "Ocorrido" },
             include: { project: { select: { name: true } } }
         });
 

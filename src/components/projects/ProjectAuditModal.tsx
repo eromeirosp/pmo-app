@@ -104,7 +104,7 @@ export function ProjectAuditModal({ projectId, isOpen, onClose }: ProjectAuditMo
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl bg-background/95 backdrop-blur-xl">
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl bg-background/95 backdrop-blur-xl min-h-0">
         <DialogHeader className="p-6 pb-2 border-b border-border/50">
           <div className="flex items-center gap-3 mb-1">
             <div className="bg-primary/10 p-2 rounded-lg">
