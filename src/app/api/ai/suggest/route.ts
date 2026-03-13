@@ -129,17 +129,36 @@ Retorne apenas o JSON, sem marcações markdown ou texto antes/depois.`;
     let response;
     try {
       response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-pro",
         contents: prompt,
       });
     } catch {
       response = await ai.models.generateContent({
-        model: "gemini-2.5-pro",
+        model: "gemini-2.5-flash",
         contents: prompt,
       });
     }
 
-    let rawText = response.text || "{}";
+    let rawText = "";
+    try {
+      rawText = response.text || "";
+    } catch (e) {
+      console.error("Error accessing response.text:", e);
+      console.log("Full response object:", JSON.stringify(response, null, 2));
+      return NextResponse.json(
+        { error: "Erro ao processar resposta da IA." },
+        { status: 500 }
+      );
+    }
+
+    if (!rawText) {
+      console.error("Empty response from AI. Full response:", JSON.stringify(response, null, 2));
+      return NextResponse.json(
+        { error: "IA não retornou conteúdo." },
+        { status: 500 }
+      );
+    }
+
     rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
 
     let result;

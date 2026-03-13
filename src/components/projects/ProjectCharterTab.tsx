@@ -13,6 +13,7 @@ import { toast } from "sonner";
 interface ProjectCharterTabProps {
   project: Project & { risks?: Risk[] };
   saveTrigger?: number;
+  onApprovalChange?: () => void;
 }
 
 interface CharterRow {
@@ -87,8 +88,8 @@ function ListSection({ title, icon, items, loading, addLabel, onAdd, onRemove, p
 
   const handleAcceptSuggestion = async (text: string) => {
     setSuggestions((prev) => prev.filter((s) => s !== text));
-    await onAdd(text);
-    toast.success("Item adicionado!");
+    await onAdd(text, 'ai');
+    toast.success("Sugestão da IA adicionada!");
   };
 
   const handleDismissSuggestion = (text: string) => {
@@ -181,10 +182,36 @@ function ListSection({ title, icon, items, loading, addLabel, onAdd, onRemove, p
   );
 }
 
-export function ProjectCharterTab({ project, saveTrigger }: ProjectCharterTabProps) {
+export function ProjectCharterTab({ project, saveTrigger, onApprovalChange }: ProjectCharterTabProps) {
   const [items, setItems] = useState<CharterRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isApproving, setIsApproving] = useState(false);
+  const [isApproved, setIsApproved] = useState(project.charterApproved);
   const baseUrl = `/api/projects/${project.id}/charter`;
+
+  useEffect(() => {
+    setIsApproved(project.charterApproved);
+  }, [project.charterApproved]);
+
+  const handleToggleApproval = async () => {
+    setIsApproving(true);
+    const newStatus = !isApproved;
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ charterApproved: newStatus }),
+      });
+      if (!res.ok) throw new Error();
+      setIsApproved(newStatus);
+      if (onApprovalChange) onApprovalChange();
+      toast.success(newStatus ? "Termo de Abertura aprovado! EAP liberada." : "Aprovação do termo removida.");
+    } catch {
+      toast.error("Erro ao atualizar status de aprovação.");
+    } finally {
+      setIsApproving(false);
+    }
+  };
 
   useEffect(() => {
     if (saveTrigger && saveTrigger > 0) {
@@ -201,11 +228,11 @@ export function ProjectCharterTab({ project, saveTrigger }: ProjectCharterTabPro
 
   const itemsOf = (type: string) => items.filter((i) => i.type === type);
 
-  const handleAdd = useCallback(async (type: string, text: string) => {
+  const handleAdd = useCallback(async (type: string, text: string, source: 'manual' | 'ai' = 'manual') => {
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, text }),
+      body: JSON.stringify({ type, text, source }),
     });
     const created = await res.json();
     setItems((prev) => [...prev, created]);
@@ -218,13 +245,48 @@ export function ProjectCharterTab({ project, saveTrigger }: ProjectCharterTabPro
 
   return (
     <div className="flex-1 max-w-5xl mx-auto w-full pb-24 px-4 space-y-8">
-      <div className="pt-4">
+      <div className="pt-4 space-y-4">
         <TabHeader
           icon={FileText}
           title="Termo de Abertura (Project Charter)"
           description="Documento formal que autoriza o projeto e define escopo inicial."
           actions={null}
         />
+
+        {/* Approval Banner */}
+        <div className={`flex flex-col md:flex-row items-center justify-between gap-4 p-4 rounded-xl border transition-all ${
+          isApproved 
+            ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-900/10 dark:border-emerald-800/30" 
+            : "bg-slate-50 border-border dark:bg-slate-800/30"
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${isApproved ? "bg-emerald-100 dark:bg-emerald-800/30 text-emerald-600" : "bg-slate-100 dark:bg-slate-800 text-slate-500"}`}>
+              {isApproved ? <CheckCircle2 className="h-5 w-5" /> : < Ban className="h-5 w-5" />}
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-900 dark:text-white">
+                Status de Aprovação: {isApproved ? "Aprovado" : "Pendente"}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {isApproved 
+                  ? "O Termo de Abertura foi validado. O planejamento da EAP está liberado." 
+                  : "Aprovação necessária para liberar a edição da EAP."}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleToggleApproval}
+            disabled={isApproving}
+            className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-50 cursor-pointer ${
+              isApproved 
+                ? "bg-emerald-600 text-white hover:bg-emerald-700" 
+                : "bg-primary text-white hover:bg-primary/90 shadow-md shadow-primary/20"
+            }`}
+          >
+            {isApproving ? <Loader2 className="h-4 w-4 animate-spin" /> : (isApproved ? <Ban className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />)}
+            {isApproved ? "Remover Aprovação" : "Aprovar Termo"}
+          </button>
+        </div>
       </div>
 
       {/* Info section */}
@@ -241,13 +303,13 @@ export function ProjectCharterTab({ project, saveTrigger }: ProjectCharterTabPro
           <div>
             <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Início</p>
             <p className="font-semibold text-slate-900 dark:text-white text-sm">
-              {(project as any).startDate ? new Date((project as any).startDate).toLocaleDateString("pt-BR") : "—"}
+              {project.startDate ? new Date(project.startDate).toLocaleDateString("pt-BR", { timeZone: 'UTC' }) : "—"}
             </p>
           </div>
           <div>
             <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Término</p>
             <p className="font-semibold text-slate-900 dark:text-white text-sm">
-              {(project as any).endDate ? new Date((project as any).endDate).toLocaleDateString("pt-BR") : "—"}
+              {project.endDate ? new Date(project.endDate).toLocaleDateString("pt-BR", { timeZone: 'UTC' }) : "—"}
             </p>
           </div>
         </div>
