@@ -42,7 +42,7 @@ interface ListSectionProps {
   items: CharterRow[];
   loading: boolean;
   addLabel: string;
-  onAdd: (text: string) => Promise<void>;
+  onAdd: (text: string, source?: 'manual' | 'ai') => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   projectId: string;
   charterType: string;
@@ -333,7 +333,7 @@ export function ProjectCharterTab({ project, saveTrigger, onApprovalChange }: Pr
           items={itemsOf(TYPES.DELIVERABLE)}
           loading={loading}
           addLabel="Adicionar entrega principal..."
-          onAdd={(text) => handleAdd(TYPES.DELIVERABLE, text)}
+          onAdd={(text, source) => handleAdd(TYPES.DELIVERABLE, text, source)}
           onRemove={handleRemove}
           projectId={project.id}
           charterType={TYPES.DELIVERABLE}
@@ -344,7 +344,7 @@ export function ProjectCharterTab({ project, saveTrigger, onApprovalChange }: Pr
           items={itemsOf(TYPES.PREMISE)}
           loading={loading}
           addLabel="Adicionar premissa..."
-          onAdd={(text) => handleAdd(TYPES.PREMISE, text)}
+          onAdd={(text, source) => handleAdd(TYPES.PREMISE, text, source)}
           onRemove={handleRemove}
           projectId={project.id}
           charterType={TYPES.PREMISE}
@@ -355,7 +355,7 @@ export function ProjectCharterTab({ project, saveTrigger, onApprovalChange }: Pr
           items={itemsOf(TYPES.RESTRICTION)}
           loading={loading}
           addLabel="Adicionar restrição..."
-          onAdd={(text) => handleAdd(TYPES.RESTRICTION, text)}
+          onAdd={(text, source) => handleAdd(TYPES.RESTRICTION, text, source)}
           onRemove={handleRemove}
           projectId={project.id}
           charterType={TYPES.RESTRICTION}
