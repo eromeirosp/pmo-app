@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Project } from "@prisma/client";
+import { Project, Prisma } from "@prisma/client";
 import {
   Briefcase, FileText, CheckCircle2, XCircle, Target,
   Plus, Circle, Trash2, Users, Mail, UserPlus, ClipboardList, Loader2, Pencil
@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface ProjectPreProjectTabProps {
-  project: Project & { artifacts?: any[] };
+  project: Project & { artifacts?: { type: string; content: Prisma.JsonValue }[] };
   saveTrigger?: number;
 }
 
@@ -62,8 +62,8 @@ export function ProjectPreProjectTab({ project, saveTrigger }: ProjectPreProject
   const [savingObj, setSavingObj] = useState(false);
   const [savingSt, setSavingSt] = useState(false);
 
-  const businessCase = project.artifacts?.find(a => a.type === "BUSINESS_CASE")?.content?.text || "";
-  const escopoPreliminar = project.artifacts?.find(a => a.type === "ESCOPO_PRELIMINAR")?.content?.text || "";
+  const businessCase = (project.artifacts?.find(a => a.type === "BUSINESS_CASE")?.content as { text?: string })?.text || "";
+  const escopoPreliminar = (project.artifacts?.find(a => a.type === "ESCOPO_PRELIMINAR")?.content as { text?: string })?.text || "";
 
   useEffect(() => {
     if (saveTrigger && saveTrigger > 0) {

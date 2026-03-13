@@ -27,7 +27,19 @@ function InputWrapper({ label, children, fullWidth = false }: { label: string; c
 }
 
 interface ProjectInfoTabProps {
-  project: any;
+  project: {
+    id: string;
+    name?: string | null;
+    description?: string | null;
+    manager?: string | null;
+    stakeholders?: string | null;
+    department?: string | null;
+    classification?: string | null;
+    status?: string | null;
+    budget?: number | string | null;
+    startDate?: string | Date | null;
+    endDate?: string | Date | null;
+  };
   saveTrigger?: number;
 }
 
