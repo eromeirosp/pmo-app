@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
+import { sanitizeShort, sanitizeForPrompt } from '@/lib/ai-sanitize';
+import { ProjectCreationSchema } from '@/lib/ai-schemas';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +15,14 @@ export async function POST(req: NextRequest) {
         if (!name || !budget || !problems) {
             return NextResponse.json({ error: 'Campos nome, orçamento e problemas são obrigatórios' }, { status: 400 });
         }
+
+        // Sanitizar inputs antes de enviar ao prompt
+        const sName = sanitizeShort(name);
+        const sManager = sanitizeShort(manager);
+        const sStakeholders = sanitizeShort(stakeholders);
+        const sProblems = sanitizeForPrompt(problems);
+        const sReturns = sanitizeForPrompt(returns);
+        const sImpacts = sanitizeForPrompt(impacts);
 
         const prompt = `Você atua como um PMO Master certificado PMP com vasta experiência em gestão de projetos corporativos.
 Analise os dados do projeto abaixo e retorne ESTRITAMENTE um JSON válido.
@@ -47,13 +57,13 @@ Analise os dados do projeto abaixo e retorne ESTRITAMENTE um JSON válido.
 }
 
 ## Dados do Projeto:
-Nome: ${name}
-Gerente: ${manager || 'Não definido'}
+Nome: ${sName}
+Gerente: ${sManager || 'Não definido'}
 Orçamento: R$ ${Number(budget).toLocaleString('pt-BR')}
-Stakeholders: ${stakeholders || 'Não informado'}
-Problemas a resolver: ${problems}
-Retornos Esperados: ${returns || 'Não informado'}
-Impactos de Não Solução: ${impacts || 'Não informado'}
+Stakeholders: ${sStakeholders || 'Não informado'}
+Problemas a resolver: ${sProblems}
+Retornos Esperados: ${sReturns || 'Não informado'}
+Impactos de Não Solução: ${sImpacts || 'Não informado'}
 
 Retorne apenas o JSON, sem marcações markdown ou texto antes/depois.`;
 
@@ -83,7 +93,14 @@ Retorne apenas o JSON, sem marcações markdown ou texto antes/depois.`;
             return NextResponse.json({ error: 'Erro ao formatar resposta da IA.' }, { status: 500 });
         }
 
-        return NextResponse.json(result);
+        // Validar estrutura da resposta com Zod
+        const parsed = ProjectCreationSchema.safeParse(result);
+        if (!parsed.success) {
+            console.error("AI response validation failed:", parsed.error.flatten());
+            return NextResponse.json({ error: 'Resposta da IA em formato inesperado.' }, { status: 502 });
+        }
+
+        return NextResponse.json(parsed.data);
     } catch (error) {
         const err = error as Error;
         console.error('Error generating AI content:', err);

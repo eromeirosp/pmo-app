@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import prisma from "@/lib/prisma";
+import { sanitizeForPrompt } from "@/lib/ai-sanitize";
+import { SUGGEST_SCHEMAS } from "@/lib/ai-schemas";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +13,9 @@ type SuggestType =
   | "charter_restrictions"
   | "status_report"
   | "risk_suggest"
-  | "classification";
+  | "classification"
+  | "eap_suggest"
+  | "closing_suggest";
 
 const PROMPTS: Record<SuggestType, string> = {
   charter_criteria: `Com base no contexto do projeto abaixo, sugira de 3 a 5 critérios de sucesso MENSURÁVEIS e específicos.
@@ -46,16 +50,43 @@ As opções são:
 
 Considere: complexidade, incerteza de requisitos, tamanho da equipe, tipo de entrega, stakeholders e orçamento.
 Retorne ESTRITAMENTE um JSON válido: { "classification": "TRADITIONAL|AGILE|HYBRID", "justification": "justificativa em 1-2 frases" }`,
+
+  eap_suggest: `Com base no contexto do projeto abaixo, sugira uma Estrutura Analítica do Projeto (EAP/WBS) hierárquica.
+Considere a classificação do projeto, o escopo preliminar, os critérios de sucesso e as entregas do charter.
+Se já existirem itens na EAP, NÃO os repita — sugira apenas itens complementares.
+
+Crie de 3 a 6 pacotes de trabalho principais (fases), cada um com 2 a 4 sub-pacotes (atividades).
+Cada item deve ter: name (nome claro e descritivo) e description (1 frase sobre o escopo).
+
+A estrutura deve seguir boas práticas de PMO: fases lógicas do projeto do início ao encerramento.`,
+
+  closing_suggest: `Com base no contexto COMPLETO do projeto abaixo (incluindo status reports, EAP, riscos e charter), gere um relatório de encerramento completo.
+
+Analise:
+- O progresso real do projeto (EAP e status reports)
+- Riscos que se materializaram vs. mitigados
+- Entregas planejadas vs. realizadas
+- Problemas reportados nos status reports
+
+Gere:
+1. "summary": Resumo executivo de 2-3 parágrafos sobre o projeto (contexto, execução, resultado)
+2. "deliverables": Array de entregas com "text" (nome da entrega) e "status" ("concluído", "parcial" ou "não entregue"), baseado nos dados reais
+3. "lessons": Array de 3-5 lições aprendidas baseadas no histórico real do projeto
+4. "recommendations": Array de 3-5 recomendações para projetos futuros baseadas na experiência deste projeto`,
 };
 
-async function getProjectContext(projectId: string) {
+async function getProjectContext(projectId: string, enriched = false) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
       risks: true,
       charterItems: true,
       artifacts: true,
-      statusReports: { orderBy: { reportDate: "desc" }, take: 3 },
+      eapItems: true,
+      closingItems: enriched ? true : undefined,
+      statusReports: enriched
+        ? { orderBy: { reportDate: "desc" } }
+        : { orderBy: { reportDate: "desc" }, take: 3 },
     },
   });
 
@@ -68,22 +99,46 @@ async function getProjectContext(projectId: string) {
     (a) => a.type === "ESCOPO_PRELIMINAR"
   );
 
-  return {
-    project,
-    contextText: `
-Nome: ${project.name}
-Gerente: ${project.manager}
+  // Sanitizar dados do projeto antes de incluir no prompt
+  let contextText = `
+Nome: ${sanitizeForPrompt(project.name, 500)}
+Gerente: ${sanitizeForPrompt(project.manager, 500)}
 Orçamento: R$ ${project.budget.toLocaleString("pt-BR")}
 Classificação: ${project.classification || "Não definida"}
-Problemas: ${project.problems || "Não informado"}
-Retornos esperados: ${project.returns || "Não informado"}
-Impactos: ${project.impacts || "Não informado"}
+Problemas: ${sanitizeForPrompt(project.problems)}
+Retornos esperados: ${sanitizeForPrompt(project.returns)}
+Impactos: ${sanitizeForPrompt(project.impacts)}
 Business Case: ${businessCase ? JSON.stringify(businessCase.content) : "Não gerado"}
 Escopo Preliminar: ${scope ? JSON.stringify(scope.content) : "Não gerado"}
-Riscos existentes: ${project.risks.map((r) => `${r.title || r.description} (P:${r.probability} I:${r.impact})`).join("; ") || "Nenhum"}
-Itens do Charter: ${project.charterItems.map((c) => `[${c.type}] ${c.text}`).join("; ") || "Nenhum"}
+Riscos existentes: ${project.risks.map((r) => `${sanitizeForPrompt(r.title || r.description, 200)} (P:${r.probability} I:${r.impact})`).join("; ") || "Nenhum"}
+Itens do Charter: ${project.charterItems.map((c) => `[${c.type}] ${sanitizeForPrompt(c.text, 300)}`).join("; ") || "Nenhum"}
 Últimos Status Reports: ${project.statusReports.map((s) => `${s.period}: ${s.overallStatus} (${s.progress}%)`).join("; ") || "Nenhum"}
-    `.trim(),
+  `.trim();
+
+  // Contexto adicional para EAP e Encerramento
+  if (project.eapItems && project.eapItems.length > 0) {
+    contextText += `\nEAP atual: ${project.eapItems.map((e) => `${sanitizeForPrompt(e.name, 200)} [${e.status}]${e.parentId ? ` (filho de ${project.eapItems.find(p => p.id === e.parentId)?.name || e.parentId})` : ""}`).join("; ")}`;
+  }
+
+  if (enriched && project.statusReports.length > 0) {
+    contextText += `\n\nHistórico completo de Status Reports:`;
+    for (const sr of project.statusReports) {
+      contextText += `\n- ${sr.period}: Status ${sr.overallStatus}, Progresso ${sr.progress}%, Escopo: ${sr.scopeStatus}, Cronograma: ${sr.scheduleStatus}, Orçamento: ${sr.budgetStatus}`;
+      if (sr.accomplishments) contextText += ` | Conquistas: ${sanitizeForPrompt(sr.accomplishments, 500)}`;
+      if (sr.issues) contextText += ` | Problemas: ${sanitizeForPrompt(sr.issues, 500)}`;
+    }
+  }
+
+  if (enriched && "closingItems" in project) {
+    const closingItems = project.closingItems as Array<{ type: string; text: string }>;
+    if (closingItems.length > 0) {
+      contextText += `\nItens de encerramento já existentes: ${closingItems.map((c) => `[${c.type}] ${sanitizeForPrompt(c.text, 300)}`).join("; ")}`;
+    }
+  }
+
+  return {
+    project,
+    contextText,
   };
 }
 
@@ -106,7 +161,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const ctx = await getProjectContext(projectId);
+    // Encerramento e EAP precisam de contexto enriquecido
+    const needsEnriched = type === "closing_suggest" || type === "eap_suggest";
+    const ctx = await getProjectContext(projectId, needsEnriched);
     if (!ctx) {
       return NextResponse.json(
         { error: "Projeto não encontrado" },
@@ -117,6 +174,8 @@ export async function POST(req: NextRequest) {
     const isListType = type.startsWith("charter_");
     const isRisk = type === "risk_suggest";
     const isClassification = type === "classification";
+    const isEap = type === "eap_suggest";
+    const isClosing = type === "closing_suggest";
 
     let responseFormat: string;
     if (isListType) {
@@ -125,6 +184,10 @@ export async function POST(req: NextRequest) {
       responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "suggestions": [{ "title": "...", "description": "...", "probability": 3, "impact": 4, "category": "...", "mitigation": "...", "contingency": "..." }] }`;
     } else if (isClassification) {
       responseFormat = ""; // Already included in the prompt
+    } else if (isEap) {
+      responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "suggestions": [{ "name": "Fase 1 - Nome", "description": "Descrição", "children": [{ "name": "Sub-pacote", "description": "Descrição" }] }] }`;
+    } else if (isClosing) {
+      responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "summary": "Resumo executivo...", "deliverables": [{ "text": "Entrega X", "status": "concluído|parcial|não entregue" }], "lessons": ["Lição 1", ...], "recommendations": ["Recomendação 1", ...] }`;
     } else {
       responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "accomplishments": "...", "nextSteps": "...", "issues": "..." }`;
     }
@@ -164,6 +227,20 @@ Retorne apenas o JSON, sem marcações markdown ou texto antes/depois.`;
         { error: "Erro ao formatar resposta da IA." },
         { status: 500 }
       );
+    }
+
+    // Validar resposta com schema Zod
+    const schema = SUGGEST_SCHEMAS[type];
+    if (schema) {
+      const parsed = schema.safeParse(result);
+      if (!parsed.success) {
+        console.error("AI response validation failed:", JSON.stringify(parsed.error.flatten()));
+        return NextResponse.json(
+          { error: "Resposta da IA em formato inesperado." },
+          { status: 502 }
+        );
+      }
+      return NextResponse.json(parsed.data);
     }
 
     return NextResponse.json(result);

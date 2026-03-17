@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Download, Plus, Trash2, Network, Loader2, ChevronUp, ChevronDown, Lock, Link2, X } from 'lucide-react';
+import { Download, Plus, Trash2, Network, Loader2, ChevronUp, ChevronDown, Lock, Link2, X, Sparkles, ChevronRight } from 'lucide-react';
 import { TabHeader } from "./TabHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from 'sonner';
@@ -17,6 +17,12 @@ type EapItem = {
   order: number;
   dependsOn: string[];
   createdAt: string;
+};
+
+type EapSuggestion = {
+  name: string;
+  description: string;
+  children: { name: string; description: string }[];
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -126,6 +132,11 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
   const formRef = React.useRef<HTMLDivElement>(null);
   const baseUrl = `/api/projects/${projectId}/eap`;
 
+  // AI Suggestions state
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<EapSuggestion[]>([]);
+  const [acceptingAll, setAcceptingAll] = useState(false);
+
   useEffect(() => {
     fetch(baseUrl)
       .then((r) => r.json())
@@ -151,7 +162,7 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
     } finally {
       setSaving(false);
     }
-  }, [baseUrl, form]);
+  }, [baseUrl, form, charterApproved]);
 
   const handleRemove = useCallback(async (id: string) => {
     setItems((prev: EapItem[]) => prev.filter((i: EapItem) => i.id !== id));
@@ -213,7 +224,6 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     [newItems[index], newItems[targetIndex]] = [newItems[targetIndex], newItems[index]];
 
-    // Re-calculate orders for all moved items to be safe
     const updatedItems = newItems.map((item: EapItem, idx: number) => ({ ...item, order: idx * 1000 }));
     setItems(updatedItems);
 
@@ -228,6 +238,72 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
     }
   }, [baseUrl, items]);
 
+  // AI Suggest
+  const handleSuggest = async () => {
+    setSuggesting(true);
+    setSuggestions([]);
+    try {
+      const res = await fetch("/api/ai/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, type: "eap_suggest" }),
+      });
+      if (!res.ok) throw new Error("Erro na IA");
+      const data = await res.json();
+      setSuggestions(data.suggestions || []);
+    } catch {
+      toast.error("Erro ao gerar sugestões de EAP com IA.");
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
+  const handleAcceptSuggestion = async (suggestion: EapSuggestion) => {
+    try {
+      // Create parent
+      const parentRes = await fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: suggestion.name, description: suggestion.description, status: 'PENDING', parentId: null }),
+      });
+      const parent = await parentRes.json();
+
+      const newItems: EapItem[] = [parent];
+
+      // Create children
+      for (const child of suggestion.children || []) {
+        const childRes = await fetch(baseUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: child.name, description: child.description, status: 'PENDING', parentId: parent.id }),
+        });
+        const created = await childRes.json();
+        newItems.push(created);
+      }
+
+      setItems((prev) => [...prev, ...newItems].sort((a, b) => a.order - b.order));
+      setSuggestions((prev) => prev.filter((s) => s.name !== suggestion.name));
+      toast.success(`"${suggestion.name}" adicionado à EAP!`);
+    } catch {
+      toast.error("Erro ao adicionar sugestão.");
+    }
+  };
+
+  const handleAcceptAll = async () => {
+    setAcceptingAll(true);
+    try {
+      for (const suggestion of suggestions) {
+        await handleAcceptSuggestion(suggestion);
+      }
+      setSuggestions([]);
+      toast.success("Todas as sugestões adicionadas!");
+    } catch {
+      toast.error("Erro ao adicionar algumas sugestões.");
+    } finally {
+      setAcceptingAll(false);
+    }
+  };
+
   const handleExport = async () => {
     if (items.length === 0) {
       toast.error("Nenhum dado para exportar.");
@@ -236,11 +312,10 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
 
     try {
       const doc = new jsPDF();
-      
-      // Title
+
       doc.setFontSize(18);
       doc.text("Estrutura Analítica do Projeto (EAP)", 14, 22);
-      
+
       doc.setFontSize(11);
       doc.setTextColor(100);
       doc.text(`Projeto ID: ${projectId}`, 14, 30);
@@ -264,7 +339,7 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
         startY: 45,
         head: [["Nome", "Descrição", "Dependências", "Status", "Criado em"]],
         body: tableData,
-        headStyles: { fillColor: [201, 163, 85], textColor: [255, 255, 255] }, // Compass Gold
+        headStyles: { fillColor: [201, 163, 85], textColor: [255, 255, 255] },
         alternateRowStyles: { fillColor: [248, 250, 252] },
         margin: { top: 45 },
       });
@@ -313,7 +388,15 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
           description="Gerencie a decomposição hierárquica do escopo do projeto."
           actions={
             <>
-              <button 
+              <button
+                onClick={handleSuggest}
+                disabled={suggesting || !charterApproved}
+                className="flex items-center justify-center gap-2 px-4 h-10 rounded-lg bg-card border border-primary/30 text-primary font-semibold text-sm hover:bg-primary/5 transition-all duration-300 active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {suggesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Sugerir com IA
+              </button>
+              <button
                 onClick={handleExport}
                 className="flex items-center justify-center gap-2 px-4 h-10 rounded-lg bg-card border border-border text-slate-700 dark:text-slate-300 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-300 active:scale-[0.98] cursor-pointer"
               >
@@ -343,6 +426,69 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
               O Termo de Abertura precisa ser aprovado antes de editar a EAP. Vá à aba &quot;Termo de Abertura&quot; e clique em &quot;Aprovar Termo&quot;.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* AI Suggestions Panel */}
+      {suggestions.length > 0 && (
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-bold text-primary flex items-center gap-2">
+              <Sparkles className="h-4 w-4" /> Sugestões da IA — Estrutura Hierárquica
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleAcceptAll}
+                disabled={acceptingAll}
+                className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 px-3 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {acceptingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                Aceitar Tudo
+              </button>
+              <button
+                onClick={() => setSuggestions([])}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {suggestions.map((s, i) => (
+            <div key={i} className="bg-background/80 rounded-lg p-4 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <p className="font-bold text-sm text-foreground">{s.name}</p>
+                  {s.description && <p className="text-xs text-muted-foreground mt-0.5">{s.description}</p>}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => handleAcceptSuggestion(s)}
+                    className="text-xs font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5 inline mr-0.5" />Adicionar
+                  </button>
+                  <button
+                    onClick={() => setSuggestions((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+              {s.children && s.children.length > 0 && (
+                <div className="ml-4 space-y-1 border-l-2 border-primary/20 pl-3">
+                  {s.children.map((child, ci) => (
+                    <div key={ci} className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <ChevronRight className="h-3 w-3 shrink-0 text-primary/40" />
+                      <span className="font-medium text-foreground">{child.name}</span>
+                      {child.description && <span className="hidden sm:inline">— {child.description}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
