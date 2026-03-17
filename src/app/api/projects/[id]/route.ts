@@ -9,6 +9,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: "ID do projeto não fornecido" }, { status: 400 });
         }
 
+
         const project = await prisma.project.findUnique({
             where: { id },
             include: {
@@ -17,6 +18,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                 },
                 risks: true,
                 versions: true,
+                charterItems: true,
+                statusReports: true,
             }
         });
 
@@ -51,8 +54,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             classification: data.classification,
             status: data.status,
             budget: data.budget ? parseFloat(data.budget.toString().replace(/[^\d.]/g, '')) : undefined,
-            startDate: data.startDate ? new Date(data.startDate) : undefined,
-            endDate: data.endDate ? new Date(data.endDate) : undefined,
+            startDate: data.startDate ? new Date(data.startDate + 'T00:00:00.000Z') : undefined,
+            endDate: data.endDate ? new Date(data.endDate + 'T00:00:00.000Z') : undefined,
+            charterApproved: data.charterApproved !== undefined ? data.charterApproved : undefined,
+            charterApprovedAt: data.charterApproved !== undefined ? (data.charterApproved ? new Date() : null) : undefined,
         };
 
         const updatedProject = await prisma.project.update({
