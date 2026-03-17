@@ -8,7 +8,6 @@ import {
   DialogTitle, 
   DialogDescription 
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
@@ -98,13 +97,17 @@ export function ProjectAuditModal({ projectId, isOpen, onClose }: ProjectAuditMo
       "Stakeholder": "Parte Interessada",
       "Risk": "Risco",
       "ClosingItem": "Item de Encerramento",
+      "CharterItem": "Item do Termo",
+      "EAPItem": "Item da EAP",
+      "Project": "Projeto",
+      "StatusReport": "Relatório de Status",
     };
     return labels[entity] || entity;
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl bg-background/95 backdrop-blur-xl min-h-0">
+      <DialogContent className="!flex !flex-col max-w-2xl max-h-[85vh] p-0 overflow-hidden border-none shadow-2xl bg-background/95 backdrop-blur-xl min-h-0">
         <DialogHeader className="p-6 pb-2 border-b border-border/50">
           <div className="flex items-center gap-3 mb-1">
             <div className="bg-primary/10 p-2 rounded-lg">
@@ -119,7 +122,7 @@ export function ProjectAuditModal({ projectId, isOpen, onClose }: ProjectAuditMo
           </div>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 px-6">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6">
           <div className="py-6 relative">
             {/* Timeline line */}
             <div className="absolute left-[19px] top-8 bottom-8 w-[2px] bg-slate-200 dark:bg-slate-800" />
@@ -211,7 +214,7 @@ export function ProjectAuditModal({ projectId, isOpen, onClose }: ProjectAuditMo
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
         
         <div className="p-4 bg-slate-50 dark:bg-slate-900/80 border-t border-border/50 text-center">
           <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">

@@ -25,6 +25,8 @@ model Project {
   updatedAt        DateTime         @updatedAt
   department       String?
   description      String?
+  charterApproved    Boolean          @default(false)
+  charterApprovedAt  DateTime?
   endDate          DateTime?
   startDate        DateTime?
   artifacts        Artifact[]
@@ -103,6 +105,7 @@ model EAPItem {
   parentId    String?
   status      String   @default("PENDING")
   order       Float    @default(0)
+  dependsOn   String[] @default([])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)

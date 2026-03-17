@@ -10,7 +10,8 @@ type SuggestType =
   | "charter_premises"
   | "charter_restrictions"
   | "status_report"
-  | "risk_suggest";
+  | "risk_suggest"
+  | "classification";
 
 const PROMPTS: Record<SuggestType, string> = {
   charter_criteria: `Com base no contexto do projeto abaixo, sugira de 3 a 5 critérios de sucesso MENSURÁVEIS e específicos.
@@ -36,6 +37,15 @@ Cada campo deve ter 2-3 frases profissionais e específicas ao projeto.`,
   risk_suggest: `Com base no contexto do projeto abaixo e nos riscos já identificados, sugira de 2 a 3 NOVOS riscos que ainda não foram catalogados.
 Para cada risco, inclua: title, description, probability (1-5), impact (1-5), category, mitigation (estratégia de mitigação).
 Categorias possíveis: Técnico, Organizacional, Externo, Gerenciamento de Projeto, Financeiro.`,
+
+  classification: `Com base no contexto do projeto abaixo, analise e sugira a classificação metodológica mais adequada.
+As opções são:
+- TRADITIONAL (Cascata/Waterfall): projetos com escopo bem definido, requisitos estáveis, entregas sequenciais
+- AGILE (Ágil): projetos com requisitos evolutivos, entregas incrementais, alta incerteza
+- HYBRID (Híbrido): combinação de ambas, planejamento cascata com execução ágil
+
+Considere: complexidade, incerteza de requisitos, tamanho da equipe, tipo de entrega, stakeholders e orçamento.
+Retorne ESTRITAMENTE um JSON válido: { "classification": "TRADITIONAL|AGILE|HYBRID", "justification": "justificativa em 1-2 frases" }`,
 };
 
 async function getProjectContext(projectId: string) {
@@ -106,12 +116,15 @@ export async function POST(req: NextRequest) {
 
     const isListType = type.startsWith("charter_");
     const isRisk = type === "risk_suggest";
+    const isClassification = type === "classification";
 
     let responseFormat: string;
     if (isListType) {
       responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "suggestions": ["item 1", "item 2", ...] }`;
     } else if (isRisk) {
       responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "suggestions": [{ "title": "...", "description": "...", "probability": 3, "impact": 4, "category": "...", "mitigation": "...", "contingency": "..." }] }`;
+    } else if (isClassification) {
+      responseFormat = ""; // Already included in the prompt
     } else {
       responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "accomplishments": "...", "nextSteps": "...", "issues": "..." }`;
     }

@@ -5,7 +5,7 @@ import { Project, Risk } from "@prisma/client";
 import { parseLocalDate } from "@/lib/utils";
 import {
   FileText, Lightbulb, CheckCircle2, Trash2, Plus,
-  Package, Pin, Ban, AlertTriangle, Loader2, Sparkles, X
+  Package, Pin, Ban, AlertTriangle, Loader2, Sparkles, X, ShieldCheck, CircleSlash
 } from "lucide-react";
 import { TabHeader } from "./TabHeader";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import { toast } from "sonner";
 interface ProjectCharterTabProps {
   project: Project & { risks?: Risk[] };
   saveTrigger?: number;
+  onApprovalChange?: (approved: boolean) => void;
 }
 
 interface CharterRow {
@@ -181,9 +182,11 @@ function ListSection({ title, icon, items, loading, addLabel, onAdd, onRemove, p
   );
 }
 
-export function ProjectCharterTab({ project, saveTrigger }: ProjectCharterTabProps) {
+export function ProjectCharterTab({ project, saveTrigger, onApprovalChange }: ProjectCharterTabProps) {
   const [items, setItems] = useState<CharterRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [charterApproved, setCharterApproved] = useState<boolean>((project as any).charterApproved ?? false);
+  const [approvingCharter, setApprovingCharter] = useState(false);
   const baseUrl = `/api/projects/${project.id}/charter`;
 
   useEffect(() => {
@@ -216,6 +219,44 @@ export function ProjectCharterTab({ project, saveTrigger }: ProjectCharterTabPro
     await fetch(`${baseUrl}?itemId=${id}`, { method: "DELETE" });
   }, [baseUrl]);
 
+  const handleApproveCharter = useCallback(async () => {
+    setApprovingCharter(true);
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ charterApproved: true }),
+      });
+      if (!res.ok) throw new Error("Erro ao aprovar");
+      setCharterApproved(true);
+      onApprovalChange?.(true);
+      toast.success("Termo de Abertura aprovado! A EAP agora pode ser editada.");
+    } catch {
+      toast.error("Erro ao aprovar o Termo de Abertura.");
+    } finally {
+      setApprovingCharter(false);
+    }
+  }, [project.id, onApprovalChange]);
+
+  const handleRemoveApproval = useCallback(async () => {
+    setApprovingCharter(true);
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ charterApproved: false }),
+      });
+      if (!res.ok) throw new Error("Erro ao remover aprovação");
+      setCharterApproved(false);
+      onApprovalChange?.(false);
+      toast.success("Aprovação removida. A EAP foi bloqueada.");
+    } catch {
+      toast.error("Erro ao remover aprovação do Termo.");
+    } finally {
+      setApprovingCharter(false);
+    }
+  }, [project.id, onApprovalChange]);
+
   return (
     <div className="flex-1 max-w-5xl mx-auto w-full pb-24 px-4 space-y-8">
       <div className="pt-4">
@@ -225,6 +266,51 @@ export function ProjectCharterTab({ project, saveTrigger }: ProjectCharterTabPro
           description="Documento formal que autoriza o projeto e define escopo inicial."
           actions={null}
         />
+      </div>
+
+      {/* Approval Banner */}
+      <div className={`flex items-center justify-between gap-4 p-5 rounded-xl border ${charterApproved ? "bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-700/30" : "bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700/30"}`}>
+        <div className="flex items-center gap-3">
+          {charterApproved
+            ? <ShieldCheck className="h-6 w-6 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            : <CircleSlash className="h-6 w-6 text-slate-400 shrink-0" />
+          }
+          <div>
+            <p className="font-bold text-sm text-slate-900 dark:text-white">
+              Status de Aprovação: {charterApproved ? "Aprovado" : "Pendente"}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {charterApproved
+                ? "Termo aprovado. A EAP está liberada para edição."
+                : "Aprovação necessária para liberar a edição da EAP."}
+            </p>
+          </div>
+        </div>
+        {charterApproved ? (
+          <button
+            onClick={handleRemoveApproval}
+            disabled={approvingCharter}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-all active:scale-[0.98] shadow-lg shadow-red-500/20 cursor-pointer disabled:opacity-50 shrink-0"
+          >
+            {approvingCharter
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <CircleSlash className="h-4 w-4" />
+            }
+            Remover Aprovação
+          </button>
+        ) : (
+          <button
+            onClick={handleApproveCharter}
+            disabled={approvingCharter}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-all active:scale-[0.98] shadow-lg shadow-primary/20 cursor-pointer disabled:opacity-50 shrink-0"
+          >
+            {approvingCharter
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <ShieldCheck className="h-4 w-4" />
+            }
+            Aprovar Termo
+          </button>
+        )}
       </div>
 
       {/* Info section */}

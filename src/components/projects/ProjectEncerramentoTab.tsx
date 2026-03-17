@@ -1,8 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { CheckSquare, BookOpen, Lightbulb, Loader2, Plus, Trash2, Circle } from "lucide-react";
+import { CheckSquare, BookOpen, Lightbulb, Loader2, Plus, Trash2, Circle, Download } from "lucide-react";
 import { TabHeader } from "./TabHeader";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,8 +55,13 @@ function EditableList({ items, loading, onAdd, onRemove, placeholder, emptyMessa
   return (
     <div className="space-y-3">
       {loading ? (
-        <div className="flex items-center text-slate-400 text-sm py-3">
-          <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando...
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3 p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl">
+              <Skeleton className="h-4 w-4 rounded-full shrink-0" />
+              <Skeleton className="h-4 flex-1" />
+            </div>
+          ))}
         </div>
       ) : (
         <>
@@ -191,6 +200,99 @@ export function ProjectEncerramentoTab({ projectId }: ProjectEncerramentoTabProp
     }
   }, [baseUrl, fetchItems]);
 
+  const handleExport = async () => {
+    const deliverables = itemsOf(TYPES.DELIVERABLE);
+    const lessons = itemsOf(TYPES.LESSON);
+    const recommendations = itemsOf(TYPES.RECOMMENDATION);
+
+    if (deliverables.length === 0 && lessons.length === 0 && recommendations.length === 0) {
+      toast.error("Nenhum dado para exportar.");
+      return;
+    }
+
+    try {
+      const doc = new jsPDF();
+
+      doc.setFontSize(18);
+      doc.text("Termo de Encerramento do Projeto", 14, 22);
+
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      doc.text(`Projeto ID: ${projectId}`, 14, 30);
+      doc.text(`Data de Exportação: ${new Date().toLocaleDateString('pt-BR')}`, 14, 35);
+
+      let startY = 48;
+
+      if (deliverables.length > 0) {
+        doc.setFontSize(13);
+        doc.setTextColor(0);
+        doc.text("Entregáveis Finais", 14, startY);
+        autoTable(doc, {
+          startY: startY + 4,
+          head: [["#", "Entregável"]],
+          body: deliverables.map((item, i) => [String(i + 1), item.text]),
+          headStyles: { fillColor: [201, 163, 85], textColor: [255, 255, 255] },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+        });
+        startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+      }
+
+      if (lessons.length > 0) {
+        doc.setFontSize(13);
+        doc.setTextColor(0);
+        doc.text("Lições Aprendidas", 14, startY);
+        autoTable(doc, {
+          startY: startY + 4,
+          head: [["#", "Lição"]],
+          body: lessons.map((item, i) => [String(i + 1), item.text]),
+          headStyles: { fillColor: [201, 163, 85], textColor: [255, 255, 255] },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+        });
+        startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+      }
+
+      if (recommendations.length > 0) {
+        doc.setFontSize(13);
+        doc.setTextColor(0);
+        doc.text("Recomendações para Projetos Futuros", 14, startY);
+        autoTable(doc, {
+          startY: startY + 4,
+          head: [["#", "Recomendação"]],
+          body: recommendations.map((item, i) => [String(i + 1), item.text]),
+          headStyles: { fillColor: [201, 163, 85], textColor: [255, 255, 255] },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+        });
+      }
+
+      const filename = `Encerramento_Projeto_${projectId}.pdf`;
+      const pdfData = doc.output('arraybuffer');
+      const blob = new Blob([pdfData], { type: 'application/pdf' });
+
+      if ('showSaveFilePicker' in window) {
+        const handle = await (window as unknown as { showSaveFilePicker: (opts: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker({
+          suggestedName: filename,
+          types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+      } else {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      }
+      toast.success("PDF gerado com sucesso!");
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      toast.error("Erro ao gerar PDF.");
+    }
+  };
+
   return (
     <div className="flex-1 max-w-5xl mx-auto w-full pb-24 px-4 space-y-8">
       <div className="pt-4">
@@ -198,6 +300,15 @@ export function ProjectEncerramentoTab({ projectId }: ProjectEncerramentoTabProp
           icon={CheckSquare}
           title="Encerramento do Projeto"
           description="Formalização do encerramento, lições aprendidas e recomendações para projetos futuros."
+          actions={
+            <button
+              onClick={handleExport}
+              className="flex items-center justify-center gap-2 px-4 h-10 rounded-lg bg-card border border-border text-slate-700 dark:text-slate-300 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-300 active:scale-[0.98] cursor-pointer"
+            >
+              <Download className="w-5 h-5" />
+              Exportar
+            </button>
+          }
         />
       </div>
 
