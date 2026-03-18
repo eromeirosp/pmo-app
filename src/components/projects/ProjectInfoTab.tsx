@@ -41,6 +41,7 @@ interface ProjectInfoTabProps {
     budget?: number | string | null;
     startDate?: string | Date | null;
     endDate?: string | Date | null;
+    computedStatus?: string | null;
   };
   saveTrigger?: number;
 }

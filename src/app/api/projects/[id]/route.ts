@@ -110,12 +110,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             budget: data.budget ? parseFloat(data.budget.toString().replace(/[^\d.]/g, '')) : undefined,
             startDate: data.startDate ? new Date(data.startDate + 'T00:00:00.000Z') : undefined,
             endDate: data.endDate ? new Date(data.endDate + 'T00:00:00.000Z') : undefined,
-            charterApproved: data.charterApproved !== undefined ? data.charterApproved : undefined,
-            charterApprovedAt: data.charterApproved !== undefined ? (data.charterApproved ? new Date() : null) : undefined,
         };
 
         if (typeof data.charterApproved === "boolean") {
             updateData.charterApproved = data.charterApproved;
+            updateData.charterApprovedAt = data.charterApproved ? new Date() : null;
         }
 
         // Status override: allow setting or clearing

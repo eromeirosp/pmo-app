@@ -210,7 +210,6 @@ export function ProjectAuditModal({ projectId, isOpen, onClose }: ProjectAuditMo
                         </div>
                       </div>
                     </div>
-                  </div>
                 ))}
               </div>
             )}

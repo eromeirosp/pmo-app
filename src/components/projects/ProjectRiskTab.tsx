@@ -174,24 +174,33 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
         title?: string;
         description?: string;
         status: string;
+        probability?: number;
+        impact?: number;
         category?: string;
         responsible?: string;
         mitigation?: string;
         contingency?: string;
       }>) => {
         if (!Array.isArray(data)) return;
-        setRisks(data.map((r) => ({
-          id: r.id,
-          level: r.level || "Médio",
-          levelColor: LEVEL_COLORS[r.level] || LEVEL_COLORS["Médio"],
-          title: r.title || r.description,
-          status: r.status,
-          impact: r.level,
-          category: r.category || "Geral",
-          responsible: r.responsible || "—",
-          mitigation: r.mitigation || "—",
-          contingency: r.contingency || "—",
-        })));
+        setRisks(data.map((r) => {
+          const prob = r.probability ?? 3;
+          const imp = r.impact ?? 3;
+          const level = r.level || calculateLevel(prob, imp);
+          return {
+            id: r.id,
+            level,
+            levelColor: LEVEL_COLORS[level] || LEVEL_COLORS["Médio"],
+            title: r.title || r.description || "—",
+            status: r.status,
+            probability: prob,
+            impact: imp,
+            score: prob * imp,
+            category: r.category || "Geral",
+            responsible: r.responsible || "—",
+            mitigation: r.mitigation || "—",
+            contingency: r.contingency || "—",
+          };
+        }));
       })
       .finally(() => setLoading(false));
   }, [baseUrl]);

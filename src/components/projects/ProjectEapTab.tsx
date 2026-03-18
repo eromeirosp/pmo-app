@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Download, Plus, Trash2, Network, Loader2, ChevronUp, ChevronDown, Lock, Link2, X, Sparkles, ChevronRight } from 'lucide-react';
+import { Download, Plus, Trash2, Network, Loader2, ChevronUp, ChevronDown, Lock, Link2, X, Sparkles, ChevronRight, Ban, AlertTriangle } from 'lucide-react';
 import { TabHeader } from "./TabHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from 'sonner';
@@ -144,7 +144,7 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
       .finally(() => setLoading(false));
   }, [baseUrl]);
 
-  const treeItems = React.useMemo(() => buildEapTree(items), [items]);
+  const treeItems = React.useMemo(() => buildTree(items), [items]);
 
   const handleAdd = useCallback(async () => {
     if (!charterApproved || !form.name.trim()) return;
@@ -693,32 +693,6 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
                             <ChevronDown className="h-5 w-5" />
                           </button>
                           <button
-                            onClick={() => handleStatusChange(item.id, item.status)}
-                            className={`px-2.5 py-0.5 rounded-full text-xs font-bold cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all ${STATUS_COLORS[item.status] || STATUS_COLORS.PENDING}`}
-                            title="Clique para alterar o status"
-                          >
-                            {item.status === 'PENDING' ? 'Pendente' : item.status === 'IN_PROGRESS' ? 'Em Progresso' : 'Concluído'}
-                          </button>
-                        </td>
-                        <td className="px-4 py-4 text-right">
-                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                            <button
-                              onClick={() => handleMove(item.id, 'up')}
-                              disabled={isFirstSibling}
-                              className="p-1 text-slate-400 hover:text-primary transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                              title="Mover para cima"
-                            >
-                              <ChevronUp className="h-5 w-5" />
-                            </button>
-                            <button
-                              onClick={() => handleMove(item.id, 'down')}
-                              disabled={isLastSibling}
-                              className="p-1 text-slate-400 hover:text-primary transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                              title="Mover para baixo"
-                            >
-                              <ChevronDown className="h-5 w-5" />
-                            </button>
-                            <button
                               onClick={() => handleRemove(item.id)}
                               className="p-1 text-slate-400 hover:text-red-500 transition-all cursor-pointer ml-1"
                               title="Remover"
@@ -728,8 +702,7 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
                           </div>
                         </td>
                       </tr>
-                    );
-                  })}
+                  ))}
                 </tbody>
               </table>
             )}
