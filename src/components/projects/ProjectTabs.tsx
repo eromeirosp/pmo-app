@@ -1,14 +1,15 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { 
-  Info, 
-  FileText, 
-  BookOpen, 
-  Network, 
-  AlertTriangle, 
-  Activity, 
-  FileCheck 
+import {
+  Info,
+  FileText,
+  BookOpen,
+  Network,
+  AlertTriangle,
+  Activity,
+  Wallet,
+  FileCheck
 } from "lucide-react";
 
 interface ProjectTabsProps {
@@ -23,6 +24,7 @@ const TABS = [
   { id: "eap", label: "EAP", icon: Network },
   { id: "matriz-risco", label: "Matriz de Risco", icon: AlertTriangle },
   { id: "status-report", label: "Status Report", icon: Activity },
+  { id: "orcamento", label: "Orçamento", icon: Wallet },
   { id: "encerramento", label: "Encerramento", icon: FileCheck },
 ];
 

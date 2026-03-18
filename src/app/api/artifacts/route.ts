@@ -23,6 +23,8 @@ export async function PUT(req: NextRequest) {
         await prisma.projectVersion.create({
             data: {
                 projectId,
+                label: `Antes de atualizar ${currentArtifact.type}`,
+                artifactType: currentArtifact.type,
                 snapshotData: {
                     artifactId: currentArtifact.id,
                     type: currentArtifact.type,

@@ -1,11 +1,12 @@
 "use client";
 
-import { ChevronLeft, Printer, Save, History, Upload, Trash2, Loader2, ShieldAlert, RotateCcw, Pencil } from "lucide-react";
+import { ChevronLeft, Printer, Save, History, Upload, Trash2, Loader2, ShieldAlert, RotateCcw, Pencil, GitBranch } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
 import { ProjectAuditModal } from "./ProjectAuditModal";
+import { ProjectVersionHistory } from "./ProjectVersionHistory";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -41,6 +42,7 @@ const STATUS_OPTIONS = [
 
 export function ProjectHeader({ project, onSave, onProjectUpdate }: ProjectHeaderProps) {
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
+  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showOverrideForm, setShowOverrideForm] = useState(false);
   const [overrideStatus, setOverrideStatus] = useState(project.statusOverride || "");
@@ -257,10 +259,24 @@ export function ProjectHeader({ project, onSave, onProjectUpdate }: ProjectHeade
               Auditoria
             </Button>
 
+            <Button
+              variant="outline"
+              className="hidden md:flex items-center gap-2 font-bold bg-secondary text-secondary-foreground border-none hover:bg-secondary/80"
+              onClick={() => setIsVersionHistoryOpen(true)}
+            >
+              <GitBranch className="h-4 w-4" />
+              Versões
+            </Button>
+
             <ProjectAuditModal
               projectId={project.id}
               isOpen={isAuditModalOpen}
               onClose={() => setIsAuditModalOpen(false)}
+            />
+            <ProjectVersionHistory
+              projectId={project.id}
+              isOpen={isVersionHistoryOpen}
+              onClose={() => setIsVersionHistoryOpen(false)}
             />
             <Button
               variant="outline"

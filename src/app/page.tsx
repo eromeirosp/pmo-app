@@ -19,6 +19,7 @@ import { StatsKPIRow } from "@/components/dashboard/StatsKPIRow";
 import { StatusDonutChart } from "@/components/dashboard/StatusDonutChart";
 import { BudgetBarChart } from "@/components/dashboard/BudgetBarChart";
 import { ProjectsAreaChart } from "@/components/dashboard/ProjectsAreaChart";
+import { StatusLegend } from "@/components/ui/status-legend";
 
 interface StatsData {
   total: number;
@@ -175,6 +176,13 @@ export default function Home() {
             avgBudget={stats.avgBudget}
           />
         ) : null}
+
+        {/* Status Legend */}
+        {!statsLoading && stats && stats.total > 0 && (
+          <div className="flex justify-end mb-4">
+            <StatusLegend compact />
+          </div>
+        )}
 
         {/* Charts Grid */}
         {statsLoading ? (

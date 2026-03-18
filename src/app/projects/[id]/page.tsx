@@ -14,6 +14,7 @@ import { ProjectCharterTab } from "@/components/projects/ProjectCharterTab";
 import { ProjectRiskTab } from "@/components/projects/ProjectRiskTab";
 import ProjectEapTab from "@/components/projects/ProjectEapTab";
 import ProjectStatusReportTab from "@/components/projects/ProjectStatusReportTab";
+import ProjectBudgetTab from "@/components/projects/ProjectBudgetTab";
 import { ProjectEncerramentoTab } from "@/components/projects/ProjectEncerramentoTab";
 import { History as HistoryIcon } from "lucide-react";
 import Topbar from "@/components/layout/Topbar";
@@ -98,9 +99,10 @@ export default function ProjectDetailsPage() {
             {activeTab === "matriz-risco" && <ProjectRiskTab project={project} />}
             {activeTab === "eap" && <ProjectEapTab projectId={project.id} charterApproved={(project as any).charterApproved ?? false} />}
             {activeTab === "status-report" && <ProjectStatusReportTab projectId={project.id} />}
+            {activeTab === "orcamento" && <ProjectBudgetTab projectId={project.id} totalBudget={project.budget} />}
             {activeTab === "encerramento" && <ProjectEncerramentoTab projectId={project.id} />}
 
-            {activeTab !== "informacoes" && activeTab !== "pre-projeto" && activeTab !== "termo-abertura" && activeTab !== "matriz-risco" && activeTab !== "eap" && activeTab !== "status-report" && activeTab !== "encerramento" && (
+            {activeTab !== "informacoes" && activeTab !== "pre-projeto" && activeTab !== "termo-abertura" && activeTab !== "matriz-risco" && activeTab !== "eap" && activeTab !== "status-report" && activeTab !== "orcamento" && activeTab !== "encerramento" && (
               <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-200/60 shadow-sm min-h-[400px]">
                 <div className="bg-slate-50 p-6 rounded-full mb-4">
                   <svg className="h-10 w-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
