@@ -15,7 +15,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params;
-  const { type, text } = await req.json();
+  const { type, text, source } = await req.json(); // source indica se veio da IA
   if (!text?.trim() || !type) return NextResponse.json({ error: "type e text são obrigatórios" }, { status: 400 });
 
   const item = await prisma.charterItem.create({ data: { projectId: id, type, text: text.trim() } });

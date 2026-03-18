@@ -15,9 +15,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
       ],
     });
     return NextResponse.json(items);
-  } catch (error: any) {
-    console.error("EAP GET Error:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+  } catch (error) {
+    const err = error as Error;
+    console.error("EAP GET Error:", err);
+    return NextResponse.json({ error: err.message || "Internal Server Error" }, { status: 500 });
   }
 }
 
@@ -27,11 +28,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { name, description, parentId, status, order } = await req.json();
     if (!name?.trim()) return NextResponse.json({ error: "Nome obrigatório" }, { status: 400 });
 
-    // If no order provided, put it at the end
+    // If no order provided, put it at the end of its sibling group
     let finalOrder = order;
     if (order === undefined) {
       const lastItem = await prisma.eAPItem.findFirst({
-        where: { projectId: id },
+        where: { projectId: id, parentId: parentId || null },
         orderBy: { order: "desc" },
       });
       finalOrder = (lastItem?.order || 0) + 1000;
@@ -50,9 +51,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
     await recordAuditLog({ projectId: id, action: "CREATE", entity: "EAPItem", entityId: item.id, newValue: name.trim() });
     return NextResponse.json(item, { status: 201 });
-  } catch (error: any) {
-    console.error("EAP POST Error:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+  } catch (error) {
+    const err = error as Error;
+    console.error("EAP POST Error:", err);
+    return NextResponse.json({ error: err.message || "Internal Server Error" }, { status: 500 });
   }
 }
 
