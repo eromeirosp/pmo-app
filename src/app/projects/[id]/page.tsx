@@ -74,9 +74,10 @@ export default function ProjectDetailsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background transition-colors duration-300">
       <Topbar />
-      <ProjectHeader 
-        project={project} 
-        onSave={() => setSaveTrigger(prev => prev + 1)} 
+      <ProjectHeader
+        project={project}
+        onSave={() => setSaveTrigger(prev => prev + 1)}
+        onProjectUpdate={() => fetchProject()}
       />
 
       <main className="max-w-[1200px] mx-auto w-full px-6 py-8 flex-1">

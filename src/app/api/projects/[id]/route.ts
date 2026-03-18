@@ -68,10 +68,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         if (signals.includes("RED")) computedStatus = "RED";
         else if (signals.includes("YELLOW")) computedStatus = "YELLOW";
 
-        // Strip helper relations from response, add computedStatus
+        // Effective status: override takes priority over computed
+        const effectiveStatus = (project as any).statusOverride || computedStatus;
+
+        // Strip helper relations from response, add computedStatus + effectiveStatus
         const { eapItems: _, statusReports: __, ...projectData } = project as any;
 
-        return NextResponse.json({ ...projectData, computedStatus }, { status: 200 });
+        return NextResponse.json({ ...projectData, computedStatus, effectiveStatus }, { status: 200 });
 
     } catch (error) {
         const err = error as Error;
@@ -112,13 +115,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             updateData.charterApproved = data.charterApproved;
         }
 
+        // Status override: allow setting or clearing
+        if (data.statusOverride !== undefined) {
+            updateData.statusOverride = data.statusOverride || null;
+            updateData.statusOverrideReason = data.statusOverrideReason || null;
+        }
+
         const updatedProject = await prisma.project.update({
             where: { id },
             data: updateData
         });
 
         // Audit log for changed fields
-        const auditFields = ["name", "status", "classification", "manager", "department", "charterApproved"] as const;
+        const auditFields = ["name", "status", "classification", "manager", "department", "charterApproved", "statusOverride", "statusOverrideReason"] as const;
         for (const field of auditFields) {
             const oldVal = String(currentProject[field] ?? "");
             const newVal = String(updatedProject[field] ?? "");

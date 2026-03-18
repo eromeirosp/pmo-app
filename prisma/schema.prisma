@@ -27,6 +27,8 @@ model Project {
   description      String?
   charterApproved    Boolean          @default(false)
   charterApprovedAt  DateTime?
+  statusOverride       String?
+  statusOverrideReason String?
   endDate          DateTime?
   startDate        DateTime?
   artifacts        Artifact[]

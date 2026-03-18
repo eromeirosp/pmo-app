@@ -2,7 +2,7 @@
 
 > Este documento serve como fonte de verdade para qualquer LLM, dev ou colaborador que trabalhe neste projeto.
 > Sempre consulte este arquivo antes de tomar decisoes de implementacao.
-> Ultima atualizacao: 2026-03-12
+> Ultima atualizacao: 2026-03-18
 
 ---
 
@@ -118,7 +118,9 @@ pmo-app/
 │   └── lib/
 │       ├── prisma.ts              # Singleton Prisma Client
 │       ├── utils.ts               # cn() + parseLocalDate()
-│       └── audit.ts               # Funcao de audit logging
+│       ├── audit.ts               # Funcao de audit logging
+│       ├── ai-sanitize.ts         # Sanitizacao de inputs para prompts IA
+│       └── ai-schemas.ts          # Schemas Zod para validacao de respostas IA
 ├── public/
 ├── .env.example
 ├── package.json
@@ -151,6 +153,10 @@ model Project {
   successCriteria      String?
   department       String?
   description      String?
+  charterApproved    Boolean          @default(false)
+  charterApprovedAt  DateTime?
+  statusOverride       String?          // Override manual do status pelo GP
+  statusOverrideReason String?          // Justificativa obrigatoria do override
   startDate        DateTime?
   endDate          DateTime?
   createdAt        DateTime         @default(now())
@@ -293,17 +299,24 @@ O risco e classificado pelo score = Probabilidade (1-5) x Impacto (1-5):
 - [x] .env.example
 - [x] Paginas de erro (404, 500, error.tsx, loading.tsx)
 - [x] Aviso de "IA le dados salvos" no Status Report
+- [x] Classificacao de projeto via IA com confirmacao do usuario
+- [x] Encerramento assistido por IA (baseado em historico do projeto)
+- [x] Sanitizacao de input anti-injection (`ai-sanitize.ts`)
+- [x] Validacao de respostas IA com Zod schemas (`ai-schemas.ts`)
+- [x] Sugestoes IA para decomposicao de EAP
+- [x] Dependencias simples entre itens EAP (`dependsOn` + validacao)
+- [x] Status semi-automatico computado (baseado em EAP, riscos, status reports)
+- [x] Audit trail expandido para todas as entidades
+- [x] Heatmap visual 5×5 real para matriz de risco (interativo, com filtro por celula)
+- [x] Progress bar calculada a partir da EAP (pendente/em progresso/concluido)
+- [x] Charter como gate para EAP (charterApproved + bloqueio UI + botao aprovar/revogar)
+- [x] EAP hierarquica visual (arvore com indent, parent selection, buildTree + depth)
+- [x] Override de status com justificativa (popover no header, campos statusOverride + statusOverrideReason no banco)
 
 ### ⬜ Incompleto / Precisa evolucao
-- [ ] EAP hierarquica — parentId existe no schema mas nao e usado (lista flat)
-- [ ] Status semaforo e 100% manual — sem componente calculado
-- [ ] Charter sem conceito de "aprovado" como gate para EAP
-- [ ] Caminho critico / dependencias entre atividades — nao existe
 - [ ] Budget tracking — budgetSpent e manual, sem sistema de lancamentos
 - [ ] Versionamento — ProjectVersion existe mas sem UI de historico/rollback
 - [ ] Cron/alertas — logica existe mas so loga no console
-- [ ] Classificacao de projeto via IA — campo e select livre, deveria ser sugestao IA
-- [ ] Encerramento assistido por IA (auto-fill com base no historico)
 - [ ] Acessibilidade — criticidade depende apenas de cor (faltam icones, labels, legendas)
 
 ### ⬜ Ausente (precisa implementar)
@@ -359,47 +372,50 @@ O risco e classificado pelo score = Probabilidade (1-5) x Impacto (1-5):
 - [x] Scoring de risco P×I real (score numerico + calculo de nivel)
 - [x] Atualizar ROADMAP.md como fonte de verdade
 
-### FASE 1 — Correcoes Estruturais de Dominio (2-3 semanas)
+### FASE 1 — IA Avancada + Melhorias de Dominio ✅ (Concluida 17/03/2026)
+> Sprint de IA avancada e correcoes estruturais de dominio.
+
+- [x] Classificacao de projeto via IA com confirmacao do usuario
+- [x] Encerramento assistido por IA (le status reports, riscos, EAP)
+- [x] Sanitizacao de input antes do prompt (anti-injection via `ai-sanitize.ts`)
+- [x] Validacao de respostas IA com Zod schemas (`ai-schemas.ts`)
+- [x] Sugestoes de IA para decomposicao de EAP
+- [x] Dependencias simples entre itens da EAP (`dependsOn` + validacao)
+- [x] Status semi-automatico computado (baseado em EAP, riscos, status reports)
+- [x] Audit trail expandido para todas as entidades
+- [x] Heatmap visual 5×5 real para matriz de risco (interativo, com filtro por celula)
+- [x] Progress bar calculada a partir da EAP (pendente/em progresso/concluido)
+- [x] Charter como gate para EAP (charterApproved + bloqueio UI + botao aprovar/revogar)
+
+### FASE 2 — Dominio e Governanca ✅ (Concluida 18/03/2026)
 > Modelo de dados e fluxo representam a realidade de PMO.
 
-**Decision Gates (precisam de reuniao antes de codar):**
-- [ ] DG-01: Quando EAP nasce formalmente? (Recomendacao: apos Charter aprovado)
-- [ ] DG-02: Modelo de aprovacao do Charter (Recomendacao: campo booleano charterApproved)
-- [ ] DG-03: Como tratar caminho critico vs dependencia? (Recomendacao: dependencias simples primeiro, CPM futuro)
+**Decision Gates:**
+- [x] DG-01: EAP nasce apos Charter aprovado ✅ (ja implementado)
+- [x] DG-02: Aprovacao do Charter via campo charterApproved ✅ (ja implementado)
 
 **Implementacao:**
-- [ ] EAP hierarquica real (arvore, indent, parent selection, parentId usado)
-- [ ] Charter como gate para EAP (campo charterApproved + UI)
-- [ ] Reformular campo classification → IA sugere, usuario confirma/edita
-- [ ] Status semaforo semi-automatico (calculado + override com justificativa)
-- [ ] Expandir audit trail para Charter, EAP, StatusReport
+- [x] EAP hierarquica visual (arvore com indent, parent selection, buildTree + depth)
+- [x] Override de status com justificativa (popover no header + statusOverride/statusOverrideReason no banco)
 
-### FASE 2 — UX/UI e Aderencia Visual (1-2 semanas)
-> Alinhar com Figma, resolver acessibilidade.
+### FASE 3 — UX/UI e Acessibilidade (proxima)
+> Alinhar com Figma, resolver acessibilidade, polimento visual.
 
 - [ ] Revisao de alinhamento com Figma (todas as telas)
 - [ ] Sistema de icones + labels para status (alem de cor) — acessibilidade
-- [ ] Heatmap visual 5×5 real para matriz de risco
-- [ ] Progress bar calculada a partir de EAP
 - [ ] Legenda visual para estados/criticidade
+- [ ] Budget tracking com sistema de lancamentos
+- [ ] UI de historico/rollback de versoes
+- [ ] Cron/alertas funcionais (notificacoes in-app)
 
-### FASE 3 — IA Util e Confiavel (2-3 semanas)
-> IA agrega valor sem confundir.
-
-- [ ] Classificacao de projeto via IA com confirmacao do usuario
-- [ ] Encerramento assistido por IA (le status reports, riscos, EAP)
-- [ ] Sanitizacao de input antes do prompt (anti-injection)
-- [ ] Sugestoes de IA para decomposicao de EAP (requer hierarquia)
-
-### FASE 4 — Formalizacao / Maturidade do Produto (3-4 semanas)
+### FASE 4 — Formalizacao / Maturidade do Produto
 > Autenticacao, governanca, testes, producao.
 
 - [ ] Autenticacao (NextAuth + Credentials)
-- [ ] DG: Modelo de assinatura digital (Recomendacao: checkbox + timestamp + nome para MVP)
 - [ ] Assinatura simbolica de Charter e Encerramento
 - [ ] Fluxo de encerramento completo com checklist e aceite
 - [ ] Testes automatizados (Vitest + Testing Library)
-- [ ] CI/CD + Deploy Vercel finalizado
+- [ ] CI/CD (GitHub Actions + Deploy Vercel finalizado)
 
 ---
 
@@ -452,5 +468,5 @@ O risco e classificado pelo score = Probabilidade (1-5) x Impacto (1-5):
 | Chave Gemini pessoal (quota) | Critico | Fallback Flash → Pro implementado |
 | Zero testes | Alto (para producao) | Adicionar Vitest na Fase 4 |
 | Sem autenticacao | Critico (para producao) | NextAuth.js na Fase 4 |
-| EAP flat (sem hierarquia) | Alto (para dominio) | Implementar na Fase 1 |
-| Status 100% manual | Medio | Semi-automatico na Fase 1 |
+| EAP hierarquica implementada | Resolvido | buildTree + depth + parent selection |
+| Status override implementado | Resolvido | Popover no header + campos no banco + audit log |
