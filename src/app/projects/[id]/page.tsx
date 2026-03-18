@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { Project, Artifact, Risk } from "@prisma/client";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { motion, AnimatePresence } from "framer-motion";
 import { ProjectHeader } from "@/components/projects/ProjectHeader";
 import { ProjectTabs } from "@/components/projects/ProjectTabs";
 import { ProjectInfoTab } from "@/components/projects/ProjectInfoTab";
@@ -13,6 +14,7 @@ import { ProjectCharterTab } from "@/components/projects/ProjectCharterTab";
 import { ProjectRiskTab } from "@/components/projects/ProjectRiskTab";
 import ProjectEapTab from "@/components/projects/ProjectEapTab";
 import ProjectStatusReportTab from "@/components/projects/ProjectStatusReportTab";
+import ProjectBudgetTab from "@/components/projects/ProjectBudgetTab";
 import { ProjectEncerramentoTab } from "@/components/projects/ProjectEncerramentoTab";
 import { History as HistoryIcon } from "lucide-react";
 import Topbar from "@/components/layout/Topbar";
@@ -73,37 +75,48 @@ export default function ProjectDetailsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background transition-colors duration-300">
       <Topbar />
-      <ProjectHeader 
-        project={project} 
-        onSave={() => setSaveTrigger(prev => prev + 1)} 
+      <ProjectHeader
+        project={project}
+        onSave={() => setSaveTrigger(prev => prev + 1)}
+        onProjectUpdate={() => fetchProject()}
       />
 
       <main className="max-w-[1200px] mx-auto w-full px-6 py-8 flex-1">
         <ProjectTabs activeTab={activeTab} onTabChange={handleTabChange} />
 
-        <div className="mt-2">
-          {activeTab === "informacoes" && <ProjectInfoTab project={project} saveTrigger={saveTrigger} />}
-          {activeTab === "pre-projeto" && <ProjectPreProjectTab project={project} saveTrigger={saveTrigger} />}
-          {activeTab === "termo-abertura" && <ProjectCharterTab project={project} saveTrigger={saveTrigger} onApprovalChange={fetchProject} />}
-          {activeTab === "matriz-risco" && <ProjectRiskTab project={project} />}
-          {activeTab === "eap" && <ProjectEapTab projectId={project.id} charterApproved={project.charterApproved} />}
-          {activeTab === "status-report" && <ProjectStatusReportTab projectId={project.id} />}
-          {activeTab === "encerramento" && <ProjectEncerramentoTab projectId={project.id} />}
-          
-          {activeTab !== "informacoes" && activeTab !== "pre-projeto" && activeTab !== "termo-abertura" && activeTab !== "matriz-risco" && activeTab !== "eap" && activeTab !== "status-report" && activeTab !== "encerramento" && (
-            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-200/60 shadow-sm min-h-[400px]">
-              <div className="bg-slate-50 p-6 rounded-full mb-4">
-                <svg className="h-10 w-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="mt-2"
+          >
+            {activeTab === "informacoes" && <ProjectInfoTab project={project} saveTrigger={saveTrigger} />}
+            {activeTab === "pre-projeto" && <ProjectPreProjectTab project={project} saveTrigger={saveTrigger} />}
+            {activeTab === "termo-abertura" && <ProjectCharterTab project={project} saveTrigger={saveTrigger} onApprovalChange={() => fetchProject()} />}
+            {activeTab === "matriz-risco" && <ProjectRiskTab project={project} />}
+            {activeTab === "eap" && <ProjectEapTab projectId={project.id} charterApproved={(project as any).charterApproved ?? false} />}
+            {activeTab === "status-report" && <ProjectStatusReportTab projectId={project.id} />}
+            {activeTab === "orcamento" && <ProjectBudgetTab projectId={project.id} totalBudget={project.budget} />}
+            {activeTab === "encerramento" && <ProjectEncerramentoTab projectId={project.id} />}
+
+            {activeTab !== "informacoes" && activeTab !== "pre-projeto" && activeTab !== "termo-abertura" && activeTab !== "matriz-risco" && activeTab !== "eap" && activeTab !== "status-report" && activeTab !== "orcamento" && activeTab !== "encerramento" && (
+              <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-200/60 shadow-sm min-h-[400px]">
+                <div className="bg-slate-50 p-6 rounded-full mb-4">
+                  <svg className="h-10 w-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 mb-1">Conteúdo em Desenvolvimento</h3>
+                <p className="text-slate-500 max-w-sm text-center">
+                  A aba &quot;{activeTab.replace('-', ' ')}&quot; está sendo preparada para alinhamento com o novo design.
+                </p>
               </div>
-              <h3 className="text-lg font-bold text-slate-900 mb-1">Conteúdo em Desenvolvimento</h3>
-              <p className="text-slate-500 max-w-sm text-center">
-                A aba &quot;{activeTab.replace('-', ' ')}&quot; está sendo preparada para alinhamento com o novo design.
-              </p>
-            </div>
-          )}
-        </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </main>
     </div>
   );

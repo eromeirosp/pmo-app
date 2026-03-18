@@ -1,7 +1,8 @@
 "use client";
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Download, Plus, Trash2, Network, Loader2, ChevronUp, ChevronDown, CornerDownRight, Ban, AlertTriangle } from 'lucide-react';
+import { Download, Plus, Trash2, Network, Loader2, ChevronUp, ChevronDown, Lock, Link2, X, Sparkles, ChevronRight } from 'lucide-react';
 import { TabHeader } from "./TabHeader";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from 'sonner';
 import { parseLocalDate } from "@/lib/utils";
 import jsPDF from 'jspdf';
@@ -11,13 +12,18 @@ type EapItem = {
   id: string;
   name: string;
   description: string | null;
+  parentId: string | null;
   status: string;
   order: number;
-  parentId: string | null;
+  dependsOn: string[];
   createdAt: string;
 };
 
-type EapItemRender = EapItem & { depth: number };
+type EapSuggestion = {
+  name: string;
+  description: string;
+  children: { name: string; description: string }[];
+};
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
@@ -25,34 +31,111 @@ const STATUS_COLORS: Record<string, string> = {
   DONE: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
 };
 
-// Helper: Transforms flat list to ordered tree array for rendering
-function buildEapTree(flatItems: EapItem[]): EapItemRender[] {
-  const rootItems = flatItems.filter(i => !i.parentId).sort((a, b) => a.order - b.order);
-  const getChildren = (parentId: string, depth: number): EapItemRender[] => {
-    const children = flatItems.filter(i => i.parentId === parentId).sort((a, b) => a.order - b.order);
-    let result: EapItemRender[] = [];
-    for (const child of children) {
-      result.push({ ...child, depth });
-      result = result.concat(getChildren(child.id, depth + 1));
-    }
-    return result;
+function DependencyPicker({ item, allItems, onChange, disabled }: {
+  item: EapItem;
+  allItems: EapItem[];
+  onChange: (deps: string[]) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const candidates = allItems.filter((i) => i.id !== item.id);
+  const depNames = item.dependsOn
+    .map((depId) => allItems.find((i) => i.id === depId)?.name)
+    .filter(Boolean);
+
+  const toggle = (depId: string) => {
+    const next = item.dependsOn.includes(depId)
+      ? item.dependsOn.filter((d) => d !== depId)
+      : [...item.dependsOn, depId];
+    onChange(next);
   };
 
-  let result: EapItemRender[] = [];
-  for (const root of rootItems) {
-    result.push({ ...root, depth: 0 });
-    result = result.concat(getChildren(root.id, 1));
+  if (candidates.length === 0) {
+    return <span className="text-xs text-slate-400 italic">—</span>;
   }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => !disabled && setOpen(!open)}
+        disabled={disabled}
+        className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-primary transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        title="Gerenciar dependências"
+      >
+        <Link2 className="h-3.5 w-3.5 shrink-0" />
+        {depNames.length > 0 ? (
+          <span className="max-w-[180px] truncate">{depNames.join(", ")}</span>
+        ) : (
+          <span className="italic">Nenhuma</span>
+        )}
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full left-0 mt-1 w-64 bg-card border border-border rounded-lg shadow-xl p-2 space-y-1 max-h-48 overflow-y-auto">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase px-1 mb-1">Depende de:</p>
+          {candidates.map((c) => (
+            <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer text-sm">
+              <input
+                type="checkbox"
+                checked={item.dependsOn.includes(c.id)}
+                onChange={() => toggle(c.id)}
+                className="rounded border-slate-300 text-primary focus:ring-primary/50"
+              />
+              <span className="truncate text-foreground">{c.name}</span>
+              <span className={`ml-auto text-[10px] font-bold ${c.status === 'DONE' ? 'text-green-600' : c.status === 'IN_PROGRESS' ? 'text-blue-600' : 'text-slate-400'}`}>
+                {c.status === 'DONE' ? '✓' : c.status === 'IN_PROGRESS' ? '◎' : '○'}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function buildTree(items: EapItem[]): (EapItem & { depth: number })[] {
+  const result: (EapItem & { depth: number })[] = [];
+  const childrenMap = new Map<string | null, EapItem[]>();
+
+  for (const item of items) {
+    const key = item.parentId || null;
+    if (!childrenMap.has(key)) childrenMap.set(key, []);
+    childrenMap.get(key)!.push(item);
+  }
+
+  function walk(parentId: string | null, depth: number) {
+    const children = childrenMap.get(parentId) || [];
+    for (const child of children) {
+      result.push({ ...child, depth });
+      walk(child.id, depth + 1);
+    }
+  }
+
+  walk(null, 0);
   return result;
 }
 
-export default function ProjectEapTab({ projectId, charterApproved = false }: { projectId: string, charterApproved?: boolean }) {
+export default function ProjectEapTab({ projectId, charterApproved = false }: { projectId: string; charterApproved?: boolean }) {
   const [items, setItems] = useState<EapItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', description: '', status: 'PENDING', parentId: '' });
   const formRef = React.useRef<HTMLDivElement>(null);
   const baseUrl = `/api/projects/${projectId}/eap`;
+
+  // AI Suggestions state
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<EapSuggestion[]>([]);
+  const [acceptingAll, setAcceptingAll] = useState(false);
 
   useEffect(() => {
     fetch(baseUrl)
@@ -64,21 +147,16 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
   const treeItems = React.useMemo(() => buildEapTree(items), [items]);
 
   const handleAdd = useCallback(async () => {
-    if (!form.name.trim()) return;
+    if (!charterApproved || !form.name.trim()) return;
     setSaving(true);
     try {
       const res = await fetch(baseUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          name: form.name, 
-          description: form.description, 
-          status: form.status,
-          parentId: form.parentId || null
-        }),
+        body: JSON.stringify({ name: form.name, description: form.description, status: form.status, parentId: form.parentId || null }),
       });
       const created = await res.json();
-      setItems((prev: EapItem[]) => [...prev, created]);
+      setItems((prev: EapItem[]) => [...prev, created].sort((a, b) => a.order - b.order));
       setForm({ name: '', description: '', status: 'PENDING', parentId: '' });
       toast.success("Item adicionado à EAP.");
     } catch {
@@ -86,7 +164,7 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
     } finally {
       setSaving(false);
     }
-  }, [baseUrl, form]);
+  }, [baseUrl, form, charterApproved]);
 
   const handleRemove = useCallback(async (id: string) => {
     // Check if it has children first on UI level
@@ -113,6 +191,7 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
   }, [baseUrl, items]);
 
   const handleStatusChange = useCallback(async (id: string, currentStatus: string) => {
+    if (!charterApproved) return;
     const cycle: Record<string, string> = {
       PENDING: 'IN_PROGRESS',
       IN_PROGRESS: 'DONE',
@@ -121,14 +200,37 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
     const newStatus = cycle[currentStatus] || 'PENDING';
     setItems((prev) => prev.map((i) => i.id === id ? { ...i, status: newStatus } : i));
     try {
-      await fetch(baseUrl, {
+      const res = await fetch(baseUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ itemId: id, status: newStatus }),
       });
+      if (!res.ok) {
+        const data = await res.json();
+        if (res.status === 422 && data.blockedBy) {
+          toast.error(`Dependências pendentes: ${data.blockedBy.join(", ")}`);
+        } else {
+          toast.error("Erro ao atualizar status.");
+        }
+        setItems((prev) => prev.map((i) => i.id === id ? { ...i, status: currentStatus } : i));
+        return;
+      }
     } catch {
       setItems((prev) => prev.map((i) => i.id === id ? { ...i, status: currentStatus } : i));
       toast.error("Erro ao atualizar status.");
+    }
+  }, [baseUrl, charterApproved]);
+
+  const handleDepsChange = useCallback(async (itemId: string, newDeps: string[]) => {
+    setItems((prev) => prev.map((i) => i.id === itemId ? { ...i, dependsOn: newDeps } : i));
+    try {
+      await fetch(baseUrl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId, dependsOn: newDeps }),
+      });
+    } catch {
+      toast.error("Erro ao salvar dependências.");
     }
   }, [baseUrl]);
 
@@ -152,12 +254,8 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
     const idx1 = newItems.findIndex(i => i.id === siblings[sibIndex].id);
     const idx2 = newItems.findIndex(i => i.id === siblings[targetIndex].id);
 
-    // Swap their orders
-    const tempOrder = newItems[idx1].order;
-    newItems[idx1].order = newItems[idx2].order;
-    newItems[idx2].order = tempOrder;
-
-    setItems(newItems);
+    const updatedItems = newItems.map((item: EapItem, idx: number) => ({ ...item, order: idx * 1000 }));
+    setItems(updatedItems);
 
     try {
       await fetch(baseUrl, {
@@ -174,6 +272,72 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
     }
   }, [baseUrl, items]);
 
+  // AI Suggest
+  const handleSuggest = async () => {
+    setSuggesting(true);
+    setSuggestions([]);
+    try {
+      const res = await fetch("/api/ai/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, type: "eap_suggest" }),
+      });
+      if (!res.ok) throw new Error("Erro na IA");
+      const data = await res.json();
+      setSuggestions(data.suggestions || []);
+    } catch {
+      toast.error("Erro ao gerar sugestões de EAP com IA.");
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
+  const handleAcceptSuggestion = async (suggestion: EapSuggestion) => {
+    try {
+      // Create parent
+      const parentRes = await fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: suggestion.name, description: suggestion.description, status: 'PENDING', parentId: null }),
+      });
+      const parent = await parentRes.json();
+
+      const newItems: EapItem[] = [parent];
+
+      // Create children
+      for (const child of suggestion.children || []) {
+        const childRes = await fetch(baseUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: child.name, description: child.description, status: 'PENDING', parentId: parent.id }),
+        });
+        const created = await childRes.json();
+        newItems.push(created);
+      }
+
+      setItems((prev) => [...prev, ...newItems].sort((a, b) => a.order - b.order));
+      setSuggestions((prev) => prev.filter((s) => s.name !== suggestion.name));
+      toast.success(`"${suggestion.name}" adicionado à EAP!`);
+    } catch {
+      toast.error("Erro ao adicionar sugestão.");
+    }
+  };
+
+  const handleAcceptAll = async () => {
+    setAcceptingAll(true);
+    try {
+      for (const suggestion of suggestions) {
+        await handleAcceptSuggestion(suggestion);
+      }
+      setSuggestions([]);
+      toast.success("Todas as sugestões adicionadas!");
+    } catch {
+      toast.error("Erro ao adicionar algumas sugestões.");
+    } finally {
+      setAcceptingAll(false);
+    }
+  };
+
   const handleExport = async () => {
     if (treeItems.length === 0) {
       toast.error("Nenhum dado para exportar.");
@@ -182,25 +346,32 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
 
     try {
       const doc = new jsPDF();
-      
+
       doc.setFontSize(18);
       doc.text("Estrutura Analítica do Projeto (EAP)", 14, 22);
-      
+
       doc.setFontSize(11);
       doc.setTextColor(100);
       doc.text(`Projeto ID: ${projectId}`, 14, 30);
       doc.text(`Data de Exportação: ${new Date().toLocaleDateString('pt-BR')}`, 14, 35);
 
-      const tableData = treeItems.map(item => [
-        `${' '.repeat(item.depth * 4)}${item.depth > 0 ? '└ ' : ''}${item.name}`,
-        item.description || "—",
-        item.status === 'PENDING' ? 'Pendente' : item.status === 'IN_PROGRESS' ? 'Em Progresso' : 'Concluído',
-        parseLocalDate(item.createdAt).toLocaleDateString('pt-BR')
-      ]);
+      const tableData = items.map(item => {
+        const depNames = item.dependsOn
+          .map((depId: string) => items.find((i: EapItem) => i.id === depId)?.name)
+          .filter(Boolean)
+          .join(", ");
+        return [
+          item.name,
+          item.description || "—",
+          depNames || "—",
+          item.status === 'PENDING' ? 'Pendente' : item.status === 'IN_PROGRESS' ? 'Em Progresso' : 'Concluído',
+          parseLocalDate(item.createdAt).toLocaleDateString('pt-BR')
+        ];
+      });
 
       autoTable(doc, {
         startY: 45,
-        head: [["Nome", "Descrição", "Status", "Criado em"]],
+        head: [["Nome", "Descrição", "Dependências", "Status", "Criado em"]],
         body: tableData,
         headStyles: { fillColor: [201, 163, 85], textColor: [255, 255, 255] },
         alternateRowStyles: { fillColor: [248, 250, 252] },
@@ -283,16 +454,25 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
           description="Gerencie a decomposição hierárquica do escopo do projeto."
           actions={
             <>
-              <button 
+              <button
+                onClick={handleSuggest}
+                disabled={suggesting || !charterApproved}
+                className="flex items-center justify-center gap-2 px-4 h-10 rounded-lg bg-card border border-primary/30 text-primary font-semibold text-sm hover:bg-primary/5 transition-all duration-300 active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {suggesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Sugerir com IA
+              </button>
+              <button
                 onClick={handleExport}
                 className="flex items-center justify-center gap-2 px-4 h-10 rounded-lg bg-card border border-border text-slate-700 dark:text-slate-300 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-300 active:scale-[0.98] cursor-pointer"
               >
                 <Download className="w-5 h-5" />
                 Exportar
               </button>
-              <button 
+              <button
                 onClick={scrollToForm}
-                className="flex items-center justify-center gap-2 px-4 h-10 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all duration-300 active:scale-[0.98] shadow-lg shadow-primary/20 cursor-pointer"
+                disabled={!charterApproved}
+                className="flex items-center justify-center gap-2 px-4 h-10 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all duration-300 active:scale-[0.98] shadow-lg shadow-primary/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Plus className="w-5 h-5" />
                 Novo Pacote
@@ -302,43 +482,216 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
         />
       </div>
 
+      {/* Charter Gate */}
+      {!charterApproved && (
+        <div className="flex items-center gap-3 p-5 rounded-xl border border-amber-200 dark:border-amber-700/30 bg-amber-50 dark:bg-amber-900/10">
+          <Lock className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <div>
+            <p className="font-bold text-sm text-amber-800 dark:text-amber-300">EAP bloqueada</p>
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              O Termo de Abertura precisa ser aprovado antes de editar a EAP. Vá à aba &quot;Termo de Abertura&quot; e clique em &quot;Aprovar Termo&quot;.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* AI Suggestions Panel */}
+      {suggestions.length > 0 && (
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-bold text-primary flex items-center gap-2">
+              <Sparkles className="h-4 w-4" /> Sugestões da IA — Estrutura Hierárquica
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleAcceptAll}
+                disabled={acceptingAll}
+                className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 px-3 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {acceptingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                Aceitar Tudo
+              </button>
+              <button
+                onClick={() => setSuggestions([])}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {suggestions.map((s, i) => (
+            <div key={i} className="bg-background/80 rounded-lg p-4 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <p className="font-bold text-sm text-foreground">{s.name}</p>
+                  {s.description && <p className="text-xs text-muted-foreground mt-0.5">{s.description}</p>}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => handleAcceptSuggestion(s)}
+                    className="text-xs font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5 inline mr-0.5" />Adicionar
+                  </button>
+                  <button
+                    onClick={() => setSuggestions((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+              {s.children && s.children.length > 0 && (
+                <div className="ml-4 space-y-1 border-l-2 border-primary/20 pl-3">
+                  {s.children.map((child, ci) => (
+                    <div key={ci} className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <ChevronRight className="h-3 w-3 shrink-0 text-primary/40" />
+                      <span className="font-medium text-foreground">{child.name}</span>
+                      {child.description && <span className="hidden sm:inline">— {child.description}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Progress Summary */}
+      {!loading && items.length > 0 && (() => {
+        const done = items.filter(i => i.status === 'DONE').length;
+        const inProgress = items.filter(i => i.status === 'IN_PROGRESS').length;
+        const pending = items.filter(i => i.status === 'PENDING').length;
+        const total = items.length;
+        const pctDone = Math.round((done / total) * 100);
+        const pctInProgress = Math.round((inProgress / total) * 100);
+        return (
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-foreground">{pctDone}%</span>
+                <span className="text-sm text-muted-foreground font-medium">concluído</span>
+              </div>
+              <div className="flex items-center gap-4 text-xs font-semibold text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                  {done} concluído{done !== 1 ? 's' : ''}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
+                  {inProgress} em progresso
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+                  {pending} pendente{pending !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
+            <div className="h-3 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
+              {pctDone > 0 && (
+                <div
+                  className="h-full bg-green-500 transition-all duration-500"
+                  style={{ width: `${pctDone}%` }}
+                />
+              )}
+              {pctInProgress > 0 && (
+                <div
+                  className="h-full bg-blue-500 transition-all duration-500"
+                  style={{ width: `${pctInProgress}%` }}
+                />
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Table Section */}
       <section className="@container">
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-md">
           <div className="overflow-x-auto">
             {loading ? (
-              <div className="flex items-center justify-center py-12 text-slate-400">
-                <Loader2 className="h-5 w-5 animate-spin mr-2" /> Carregando itens da EAP...
-              </div>
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/20">
+                    <th className="px-4 py-4 border-b border-border min-w-[220px]"><Skeleton className="h-4 w-16" /></th>
+                    <th className="px-4 py-4 border-b border-border min-w-[240px]"><Skeleton className="h-4 w-20" /></th>
+                    <th className="px-4 py-4 border-b border-border min-w-[160px]"><Skeleton className="h-4 w-24" /></th>
+                    <th className="px-4 py-4 border-b border-border text-center"><Skeleton className="h-4 w-14 mx-auto" /></th>
+                    <th className="px-4 py-4 border-b border-border text-right"><Skeleton className="h-4 w-12 ml-auto" /></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {[...Array(5)].map((_, i) => (
+                    <tr key={i}>
+                      <td className="px-4 py-4"><Skeleton className="h-4 w-40" /></td>
+                      <td className="px-4 py-4"><Skeleton className="h-4 w-52" /></td>
+                      <td className="px-4 py-4"><Skeleton className="h-4 w-28" /></td>
+                      <td className="px-4 py-4 text-center"><Skeleton className="h-6 w-24 rounded-full mx-auto" /></td>
+                      <td className="px-4 py-4 text-right"><Skeleton className="h-5 w-20 ml-auto" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             ) : (
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800/20">
-                    <th className="px-4 py-4 text-slate-900 dark:text-slate-100 text-sm font-bold border-b border-border min-w-[320px]">Nome</th>
-                    <th className="px-4 py-4 text-slate-900 dark:text-slate-100 text-sm font-bold border-b border-border min-w-[260px]">Descrição</th>
+                    <th className="px-4 py-4 text-slate-900 dark:text-slate-100 text-sm font-bold border-b border-border min-w-[220px]">Nome</th>
+                    <th className="px-4 py-4 text-slate-900 dark:text-slate-100 text-sm font-bold border-b border-border min-w-[240px]">Descrição</th>
+                    <th className="px-4 py-4 text-slate-900 dark:text-slate-100 text-sm font-bold border-b border-border min-w-[160px]">Dependências</th>
                     <th className="px-4 py-4 text-slate-900 dark:text-slate-100 text-sm font-bold border-b border-border text-center">Status</th>
                     <th className="px-4 py-4 text-slate-900 dark:text-slate-100 text-sm font-bold border-b border-border text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {treeItems.length === 0 && (
-                    <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-400 italic">Nenhum item cadastrado. Adicione abaixo.</td></tr>
+                  {items.length === 0 && (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-400 italic">Nenhum item cadastrado. Adicione abaixo.</td></tr>
                   )}
-                  {treeItems.map((item: EapItemRender, index: number) => {
-                    const siblings = items.filter(i => i.parentId === item.parentId).sort((a,b) => a.order - b.order);
-                    const isFirstSibling = siblings[0]?.id === item.id;
-                    const isLastSibling = siblings[siblings.length - 1]?.id === item.id;
-
-                    return (
-                      <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
-                        <td className="px-4 py-4">
-                          <div className="flex items-center gap-2" style={{ paddingLeft: `${item.depth * 1.5}rem` }}>
-                            {item.depth > 0 && <CornerDownRight className="w-4 h-4 text-slate-400 shrink-0" />}
-                            <span className="text-slate-900 dark:text-white text-sm font-medium">{item.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 text-slate-600 dark:text-slate-400 text-sm">{item.description || '—'}</td>
-                        <td className="px-4 py-4 text-center">
+                  {buildTree(items).map((item, index) => (
+                    <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
+                      <td className="px-4 py-4 text-slate-900 dark:text-white text-sm font-medium">
+                        <span style={{ paddingLeft: `${item.depth * 24}px` }} className="flex items-center gap-1.5">
+                          {item.depth > 0 && <span className="text-slate-300 dark:text-slate-600">└</span>}
+                          {item.name}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-slate-600 dark:text-slate-400 text-sm">{item.description || '—'}</td>
+                      <td className="px-4 py-4">
+                        <DependencyPicker
+                          item={item}
+                          allItems={items}
+                          onChange={(deps) => handleDepsChange(item.id, deps)}
+                          disabled={!charterApproved}
+                        />
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <button
+                          onClick={() => handleStatusChange(item.id, item.status)}
+                          className={`px-2.5 py-0.5 rounded-full text-xs font-bold cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all ${STATUS_COLORS[item.status] || STATUS_COLORS.PENDING}`}
+                          title="Clique para alterar o status"
+                        >
+                          {item.status === 'PENDING' ? 'Pendente' : item.status === 'IN_PROGRESS' ? 'Em Progresso' : 'Concluído'}
+                        </button>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                          <button
+                            onClick={() => handleMove(item.id, 'up')}
+                            disabled={index === 0}
+                            className="p-1 text-slate-400 hover:text-primary transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="Mover para cima"
+                          >
+                            <ChevronUp className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleMove(item.id, 'down')}
+                            disabled={index === items.length - 1}
+                            className="p-1 text-slate-400 hover:text-primary transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="Mover para baixo"
+                          >
+                            <ChevronDown className="h-5 w-5" />
+                          </button>
                           <button
                             onClick={() => handleStatusChange(item.id, item.status)}
                             className={`px-2.5 py-0.5 rounded-full text-xs font-bold cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all ${STATUS_COLORS[item.status] || STATUS_COLORS.PENDING}`}
@@ -431,6 +784,19 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
           </div>
 
           <div className="md:col-span-12">
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Pacote Pai (Opcional)</label>
+            <select
+              className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-50 px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+              value={form.parentId}
+              onChange={(e) => setForm({ ...form, parentId: e.target.value })}
+            >
+              <option value="">-- Raiz (Nenhum pacote pai) --</option>
+              {items.map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="md:col-span-12">
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Descrição</label>
             <textarea
               className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500 px-4 py-3 text-sm focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300"
@@ -443,7 +809,7 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
           <div className="md:col-span-12 flex justify-end pt-4 border-t border-border">
             <button
               onClick={handleAdd}
-              disabled={saving || !form.name.trim()}
+              disabled={saving || !form.name.trim() || !charterApproved}
               className="flex items-center justify-center gap-2 px-8 h-12 rounded-lg bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-all duration-300 active:scale-[0.98] shadow-lg shadow-primary/20 cursor-pointer disabled:opacity-50"
               type="button"
             >

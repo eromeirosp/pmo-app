@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { User, Calendar, DollarSign, Building2 } from "lucide-react";
+import { User, Calendar, DollarSign, Building2, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { parseLocalDate } from "@/lib/utils";
 
 interface EAPItemSlim {
@@ -58,7 +58,13 @@ export function ProjectCard({ project }: ProjectCardProps) {
                 </h4>
 
                 <div className="flex items-center gap-2 mb-5">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-bold border ${badgeColor}`}>
+                    <span
+                        className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-bold border ${badgeColor}`}
+                        aria-label={`Status: ${project.status === 'GREEN' ? 'No Prazo' : project.status === 'YELLOW' ? 'Em Atenção' : 'Atrasado'}`}
+                    >
+                        {project.status === 'GREEN' && <CheckCircle2 className="h-3 w-3" />}
+                        {project.status === 'YELLOW' && <AlertTriangle className="h-3 w-3" />}
+                        {project.status === 'RED' && <XCircle className="h-3 w-3" />}
                         {project.status === 'GREEN' ? 'No Prazo' : project.status === 'YELLOW' ? 'Em Atenção' : 'Atrasado'}
                     </span>
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-bold border border-border text-muted-foreground bg-secondary">

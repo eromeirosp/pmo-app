@@ -13,8 +13,10 @@ export function cn(...inputs: ClassValue[]) {
  */
 export function parseLocalDate(dateStr: string | Date): Date {
   if (dateStr instanceof Date) return dateStr;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    return new Date(dateStr + "T00:00:00");
+  // Extrair apenas a parte YYYY-MM-DD de qualquer formato ISO
+  const match = dateStr.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) {
+    return new Date(match[1] + "T00:00:00");
   }
   return new Date(dateStr);
 }

@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Project } from "@prisma/client";
-import { AlertTriangle, PlusCircle, Plus, Trash2, Loader2, AlertCircle, Pencil, Sparkles, X } from "lucide-react";
+import { AlertTriangle, PlusCircle, Plus, Trash2, Loader2, AlertCircle, Pencil, Sparkles, X, ShieldCheck } from "lucide-react";
+import { motion } from "framer-motion";
 import { TabHeader } from "./TabHeader";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -63,9 +65,88 @@ function calculateLevel(probability: number, impact: number): string {
   return "Muito Baixo";
 }
 
+const HEATMAP_COLORS: Record<string, string> = {
+  "Muito Alto": "bg-red-500/80 hover:bg-red-500",
+  "Alto": "bg-orange-400/80 hover:bg-orange-400",
+  "Médio": "bg-amber-300/80 hover:bg-amber-300",
+  "Baixo": "bg-yellow-200/80 hover:bg-yellow-200",
+  "Muito Baixo": "bg-green-200/80 hover:bg-green-200",
+};
+
+function RiskHeatmap({ risks, activeCell, onCellClick }: {
+  risks: RiskItem[];
+  activeCell: string | null;
+  onCellClick: (key: string | null) => void;
+}) {
+  const getCellRisks = (prob: number, imp: number) =>
+    risks.filter(r => r.probability === prob && r.impact === imp);
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Matriz de Riscos 5×5</h3>
+        {activeCell && (
+          <button
+            onClick={() => onCellClick(null)}
+            className="text-xs text-primary hover:underline cursor-pointer"
+          >
+            Limpar filtro
+          </button>
+        )}
+      </div>
+      <div className="flex gap-2 max-w-md mx-auto">
+        {/* Y-axis label */}
+        <div className="flex flex-col items-center justify-center mr-1">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider [writing-mode:vertical-lr] rotate-180">
+            Impacto
+          </span>
+        </div>
+        <div className="flex-1 space-y-1">
+          {[5, 4, 3, 2, 1].map((impact) => (
+            <div key={impact} className="flex items-center gap-1">
+              <span className="text-[10px] font-semibold text-muted-foreground w-5 text-right shrink-0">{impact}</span>
+              <div className="flex-1 grid grid-cols-5 gap-1">
+                {[1, 2, 3, 4, 5].map((prob) => {
+                  const cellKey = `${prob}-${impact}`;
+                  const cellRisks = getCellRisks(prob, impact);
+                  const level = calculateLevel(prob, impact);
+                  const isActive = activeCell === cellKey;
+                  return (
+                    <button
+                      key={cellKey}
+                      onClick={() => onCellClick(isActive ? null : cellKey)}
+                      className={`relative aspect-square max-h-14 rounded-lg flex items-center justify-center text-xs font-bold transition-all cursor-pointer ${HEATMAP_COLORS[level]} ${isActive ? "ring-2 ring-primary ring-offset-2 dark:ring-offset-slate-900 scale-105" : ""} ${cellRisks.length > 0 ? "text-slate-900" : "text-slate-400/50"}`}
+                      title={cellRisks.length > 0 ? cellRisks.map(r => r.title).join(", ") : `P${prob} × I${impact} = ${prob * impact}`}
+                    >
+                      {cellRisks.length > 0 ? cellRisks.length : ""}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          {/* X-axis labels */}
+          <div className="flex items-center gap-1 pt-1">
+            <span className="w-5" />
+            <div className="flex-1 grid grid-cols-5 gap-1">
+              {[1, 2, 3, 4, 5].map((p) => (
+                <span key={p} className="text-[10px] font-semibold text-muted-foreground text-center">{p}</span>
+              ))}
+            </div>
+          </div>
+          <div className="flex justify-center pt-0.5">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Probabilidade</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
   const [risks, setRisks] = useState<RiskItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [heatmapFilter, setHeatmapFilter] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [editingRisk, setEditingRisk] = useState<RiskItem | null>(null);
   const [editForm, setEditForm] = useState({
@@ -303,8 +384,15 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
     "Baixo": 3,
     "Muito Baixo": 4
   };
+  
+  const filteredRisks = heatmapFilter
+    ? (() => {
+        const [prob, imp] = heatmapFilter.split('-').map(Number);
+        return risks.filter(r => r.probability === prob && r.impact === imp);
+      })()
+    : risks;
 
-  const sortedRisks = [...risks].sort((a, b) => {
+  const sortedRisks = [...filteredRisks].sort((a, b) => {
     const orderA = LEVEL_ORDER[a.level as keyof typeof LEVEL_ORDER] ?? 5;
     const orderB = LEVEL_ORDER[b.level as keyof typeof LEVEL_ORDER] ?? 5;
     return orderA - orderB;
@@ -375,21 +463,58 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
         </div>
       )}
 
+      {/* Risk Heatmap */}
+      {!loading && risks.length > 0 && (
+        <RiskHeatmap risks={risks} activeCell={heatmapFilter} onCellClick={setHeatmapFilter} />
+      )}
+
       {/* Risk Cards Grid */}
       {loading ? (
-        <div className="flex items-center justify-center py-12 text-slate-400">
-          <Loader2 className="h-5 w-5 animate-spin mr-2" /> Carregando riscos...
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-card border border-border rounded-xl p-5 space-y-4">
+              <div className="flex justify-between items-start">
+                <Skeleton className="h-6 w-28 rounded-full" />
+                <Skeleton className="h-4 w-4 rounded" />
+              </div>
+              <Skeleton className="h-5 w-3/4" />
+              <div className="grid grid-cols-2 gap-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+              <div className="pt-4 border-t border-border space-y-3">
+                <Skeleton className="h-3 w-36" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-3 w-36" />
+                <Skeleton className="h-4 w-full" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {sortedRisks.length === 0 && (
             <p className="col-span-2 text-sm text-slate-400 italic text-center py-8">Nenhum risco cadastrado. Adicione abaixo.</p>
           )}
-          {sortedRisks.map((risk) => (
-            <div key={risk.id} className="bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group">
+          {sortedRisks.map((risk, index) => (
+            <motion.div
+              key={risk.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.05 }}
+              className="bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group"
+            >
               <div className="p-5">
                 <div className="flex justify-between items-start mb-3">
-                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${risk.levelColor}`}>
+                  <span
+                    className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${risk.levelColor}`}
+                    aria-label={`Nível de risco: ${risk.level} (Score ${risk.score})`}
+                  >
+                    {(risk.level === "Muito Alto" || risk.level === "Alto") && <AlertTriangle className="h-3.5 w-3.5" />}
+                    {risk.level === "Médio" && <AlertCircle className="h-3.5 w-3.5" />}
+                    {(risk.level === "Baixo" || risk.level === "Muito Baixo") && <ShieldCheck className="h-3.5 w-3.5" />}
                     Risco {risk.level}
                   </span>
 
@@ -451,7 +576,7 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       )}

@@ -1,8 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { CheckSquare, BookOpen, Lightbulb, Loader2, Plus, Trash2, Circle } from "lucide-react";
+import { CheckSquare, BookOpen, Lightbulb, Loader2, Plus, Trash2, Circle, Download, Sparkles, X, FileText } from "lucide-react";
 import { TabHeader } from "./TabHeader";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +23,13 @@ interface ClosingRow {
   id: string;
   type: string;
   text: string;
+}
+
+interface ClosingSuggestions {
+  summary: string;
+  deliverables: { text: string; status: string }[];
+  lessons: string[];
+  recommendations: string[];
 }
 
 interface EditableListProps {
@@ -51,8 +62,13 @@ function EditableList({ items, loading, onAdd, onRemove, placeholder, emptyMessa
   return (
     <div className="space-y-3">
       {loading ? (
-        <div className="flex items-center text-slate-400 text-sm py-3">
-          <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando...
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3 p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl">
+              <Skeleton className="h-4 w-4 rounded-full shrink-0" />
+              <Skeleton className="h-4 flex-1" />
+            </div>
+          ))}
         </div>
       ) : (
         <>
@@ -66,7 +82,7 @@ function EditableList({ items, loading, onAdd, onRemove, placeholder, emptyMessa
             >
               <Circle className="h-4 w-4 text-slate-300 dark:text-slate-600 shrink-0" />
               <span className="flex-1 text-sm text-slate-700 dark:text-slate-300">{item.text}</span>
-              
+
               <AlertDialog open={itemToDelete === item.id} onOpenChange={(open) => !open && setItemToDelete(null)}>
                 <AlertDialogTrigger asChild>
                   <button
@@ -137,6 +153,10 @@ export function ProjectEncerramentoTab({ projectId }: ProjectEncerramentoTabProp
   const [loading, setLoading] = useState(true);
   const baseUrl = `/api/projects/${projectId}/closing`;
 
+  // AI state
+  const [suggesting, setSuggesting] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<ClosingSuggestions | null>(null);
+
   const fetchItems = useCallback(async () => {
     try {
       const res = await fetch(baseUrl);
@@ -164,9 +184,9 @@ export function ProjectEncerramentoTab({ projectId }: ProjectEncerramentoTabProp
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type, text }),
       });
-      
+
       if (!res.ok) throw new Error("Erro ao criar item");
-      
+
       const created = await res.json();
       setItems((prev) => [...prev, created]);
     } catch (error) {
@@ -177,12 +197,10 @@ export function ProjectEncerramentoTab({ projectId }: ProjectEncerramentoTabProp
 
   const handleRemove = useCallback(async (id: string) => {
     try {
-      // Otimista: remove do estado imediatamente
       setItems((prev) => prev.filter((i) => i.id !== id));
-      
+
       const res = await fetch(`${baseUrl}?itemId=${id}`, { method: "DELETE" });
       if (!res.ok) {
-        // Se falhar, reverte (mais complexo, vamos re-buscar por enquanto se falhar)
         fetchItems();
         throw new Error("Erro ao remover item");
       }
@@ -191,6 +209,172 @@ export function ProjectEncerramentoTab({ projectId }: ProjectEncerramentoTabProp
     }
   }, [baseUrl, fetchItems]);
 
+  // AI Suggest
+  const handleSuggest = async () => {
+    setSuggesting(true);
+    setAiSuggestions(null);
+    try {
+      const res = await fetch("/api/ai/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, type: "closing_suggest" }),
+      });
+      if (!res.ok) throw new Error("Erro na IA");
+      const data = await res.json();
+      setAiSuggestions(data);
+    } catch {
+      toast.error("Erro ao gerar sugestões de encerramento com IA.");
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
+  const handleAcceptDeliverable = async (d: { text: string; status: string }) => {
+    const fullText = `${d.text} [${d.status}]`;
+    await handleAdd(TYPES.DELIVERABLE, fullText);
+    setAiSuggestions((prev) => prev ? {
+      ...prev,
+      deliverables: prev.deliverables.filter((item) => item.text !== d.text),
+    } : null);
+    toast.success("Entregável adicionado!");
+  };
+
+  const handleAcceptLesson = async (lesson: string) => {
+    await handleAdd(TYPES.LESSON, lesson);
+    setAiSuggestions((prev) => prev ? {
+      ...prev,
+      lessons: prev.lessons.filter((l) => l !== lesson),
+    } : null);
+    toast.success("Lição adicionada!");
+  };
+
+  const handleAcceptRecommendation = async (rec: string) => {
+    await handleAdd(TYPES.RECOMMENDATION, rec);
+    setAiSuggestions((prev) => prev ? {
+      ...prev,
+      recommendations: prev.recommendations.filter((r) => r !== rec),
+    } : null);
+    toast.success("Recomendação adicionada!");
+  };
+
+  const handleAcceptAll = async () => {
+    if (!aiSuggestions) return;
+    try {
+      for (const d of aiSuggestions.deliverables) {
+        await handleAdd(TYPES.DELIVERABLE, `${d.text} [${d.status}]`);
+      }
+      for (const l of aiSuggestions.lessons) {
+        await handleAdd(TYPES.LESSON, l);
+      }
+      for (const r of aiSuggestions.recommendations) {
+        await handleAdd(TYPES.RECOMMENDATION, r);
+      }
+      setAiSuggestions(null);
+      toast.success("Todas as sugestões adicionadas!");
+    } catch {
+      toast.error("Erro ao adicionar algumas sugestões.");
+    }
+  };
+
+  const handleExport = async () => {
+    const deliverables = itemsOf(TYPES.DELIVERABLE);
+    const lessons = itemsOf(TYPES.LESSON);
+    const recommendations = itemsOf(TYPES.RECOMMENDATION);
+
+    if (deliverables.length === 0 && lessons.length === 0 && recommendations.length === 0) {
+      toast.error("Nenhum dado para exportar.");
+      return;
+    }
+
+    try {
+      const doc = new jsPDF();
+
+      doc.setFontSize(18);
+      doc.text("Termo de Encerramento do Projeto", 14, 22);
+
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      doc.text(`Projeto ID: ${projectId}`, 14, 30);
+      doc.text(`Data de Exportação: ${new Date().toLocaleDateString('pt-BR')}`, 14, 35);
+
+      let startY = 48;
+
+      if (deliverables.length > 0) {
+        doc.setFontSize(13);
+        doc.setTextColor(0);
+        doc.text("Entregáveis Finais", 14, startY);
+        autoTable(doc, {
+          startY: startY + 4,
+          head: [["#", "Entregável"]],
+          body: deliverables.map((item, i) => [String(i + 1), item.text]),
+          headStyles: { fillColor: [201, 163, 85], textColor: [255, 255, 255] },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+        });
+        startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+      }
+
+      if (lessons.length > 0) {
+        doc.setFontSize(13);
+        doc.setTextColor(0);
+        doc.text("Lições Aprendidas", 14, startY);
+        autoTable(doc, {
+          startY: startY + 4,
+          head: [["#", "Lição"]],
+          body: lessons.map((item, i) => [String(i + 1), item.text]),
+          headStyles: { fillColor: [201, 163, 85], textColor: [255, 255, 255] },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+        });
+        startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+      }
+
+      if (recommendations.length > 0) {
+        doc.setFontSize(13);
+        doc.setTextColor(0);
+        doc.text("Recomendações para Projetos Futuros", 14, startY);
+        autoTable(doc, {
+          startY: startY + 4,
+          head: [["#", "Recomendação"]],
+          body: recommendations.map((item, i) => [String(i + 1), item.text]),
+          headStyles: { fillColor: [201, 163, 85], textColor: [255, 255, 255] },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+        });
+      }
+
+      const filename = `Encerramento_Projeto_${projectId}.pdf`;
+      const pdfData = doc.output('arraybuffer');
+      const blob = new Blob([pdfData], { type: 'application/pdf' });
+
+      if ('showSaveFilePicker' in window) {
+        const handle = await (window as unknown as { showSaveFilePicker: (opts: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker({
+          suggestedName: filename,
+          types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+      } else {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      }
+      toast.success("PDF gerado com sucesso!");
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      toast.error("Erro ao gerar PDF.");
+    }
+  };
+
+  const STATUS_BADGE: Record<string, string> = {
+    "concluído": "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+    "parcial": "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    "não entregue": "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  };
+
   return (
     <div className="flex-1 max-w-5xl mx-auto w-full pb-24 px-4 space-y-8">
       <div className="pt-4">
@@ -198,8 +382,144 @@ export function ProjectEncerramentoTab({ projectId }: ProjectEncerramentoTabProp
           icon={CheckSquare}
           title="Encerramento do Projeto"
           description="Formalização do encerramento, lições aprendidas e recomendações para projetos futuros."
+          actions={
+            <>
+              <button
+                onClick={handleSuggest}
+                disabled={suggesting}
+                className="flex items-center justify-center gap-2 px-4 h-10 rounded-lg bg-card border border-primary/30 text-primary font-semibold text-sm hover:bg-primary/5 transition-all duration-300 active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {suggesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Gerar com IA
+              </button>
+              <button
+                onClick={handleExport}
+                className="flex items-center justify-center gap-2 px-4 h-10 rounded-lg bg-card border border-border text-slate-700 dark:text-slate-300 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-300 active:scale-[0.98] cursor-pointer"
+              >
+                <Download className="w-5 h-5" />
+                Exportar
+              </button>
+            </>
+          }
         />
       </div>
+
+      {/* AI Suggestions Panel */}
+      {aiSuggestions && (
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-5 space-y-5">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-bold text-primary flex items-center gap-2">
+              <Sparkles className="h-4 w-4" /> Sugestões da IA — Encerramento
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleAcceptAll}
+                className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 px-3 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Aceitar Tudo
+              </button>
+              <button
+                onClick={() => setAiSuggestions(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Executive Summary */}
+          {aiSuggestions.summary && (
+            <div className="bg-background/80 rounded-lg p-4">
+              <p className="text-xs font-bold text-muted-foreground uppercase mb-2 flex items-center gap-1.5">
+                <FileText className="h-3.5 w-3.5" /> Resumo Executivo
+              </p>
+              <p className="text-sm text-foreground whitespace-pre-line">{aiSuggestions.summary}</p>
+            </div>
+          )}
+
+          {/* Deliverables */}
+          {aiSuggestions.deliverables.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
+                <CheckSquare className="h-3.5 w-3.5" /> Entregáveis ({aiSuggestions.deliverables.length})
+              </p>
+              {aiSuggestions.deliverables.map((d, i) => (
+                <div key={i} className="flex items-center gap-2 bg-background/80 rounded-lg p-2.5">
+                  <span className="flex-1 text-sm text-foreground">{d.text}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_BADGE[d.status] || STATUS_BADGE["concluído"]}`}>
+                    {d.status}
+                  </span>
+                  <button
+                    onClick={() => handleAcceptDeliverable(d)}
+                    className="shrink-0 text-xs font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5 inline mr-0.5" />Adicionar
+                  </button>
+                  <button
+                    onClick={() => setAiSuggestions((prev) => prev ? { ...prev, deliverables: prev.deliverables.filter((_, idx) => idx !== i) } : null)}
+                    className="shrink-0 text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Lessons */}
+          {aiSuggestions.lessons.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
+                <BookOpen className="h-3.5 w-3.5" /> Lições Aprendidas ({aiSuggestions.lessons.length})
+              </p>
+              {aiSuggestions.lessons.map((l, i) => (
+                <div key={i} className="flex items-start gap-2 bg-background/80 rounded-lg p-2.5">
+                  <span className="flex-1 text-sm text-foreground break-words min-w-0">{l}</span>
+                  <button
+                    onClick={() => handleAcceptLesson(l)}
+                    className="shrink-0 text-xs font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5 inline mr-0.5" />Adicionar
+                  </button>
+                  <button
+                    onClick={() => setAiSuggestions((prev) => prev ? { ...prev, lessons: prev.lessons.filter((_, idx) => idx !== i) } : null)}
+                    className="shrink-0 text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Recommendations */}
+          {aiSuggestions.recommendations.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
+                <Lightbulb className="h-3.5 w-3.5" /> Recomendações ({aiSuggestions.recommendations.length})
+              </p>
+              {aiSuggestions.recommendations.map((r, i) => (
+                <div key={i} className="flex items-start gap-2 bg-background/80 rounded-lg p-2.5">
+                  <span className="flex-1 text-sm text-foreground break-words min-w-0">{r}</span>
+                  <button
+                    onClick={() => handleAcceptRecommendation(r)}
+                    className="shrink-0 text-xs font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5 inline mr-0.5" />Adicionar
+                  </button>
+                  <button
+                    onClick={() => setAiSuggestions((prev) => prev ? { ...prev, recommendations: prev.recommendations.filter((_, idx) => idx !== i) } : null)}
+                    className="shrink-0 text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -265,4 +585,3 @@ export function ProjectEncerramentoTab({ projectId }: ProjectEncerramentoTabProp
     </div>
   );
 }
-

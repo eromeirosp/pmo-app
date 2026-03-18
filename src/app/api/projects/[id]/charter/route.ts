@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { recordAuditLog } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -18,22 +19,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!text?.trim() || !type) return NextResponse.json({ error: "type e text são obrigatórios" }, { status: 400 });
 
   const item = await prisma.charterItem.create({ data: { projectId: id, type, text: text.trim() } });
-
-  // Criar log de auditoria
-  const auditAction = source === 'ai' 
-    ? `[IA] Sugestão de '${type}' adicionada.` 
-    : `'${type}' adicionado manualmente.`;
-
-  await prisma.auditLog.create({
-    data: {
-      projectId: id,
-      action: auditAction,
-      entity: "CharterItem",
-      entityId: item.id,
-      newValue: item.text,
-    },
-  });
-
+  await recordAuditLog({ projectId: id, action: "CREATE", entity: "CharterItem", entityId: item.id, field: type, newValue: text.trim() });
   return NextResponse.json(item, { status: 201 });
 }
 
@@ -42,6 +28,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const itemId = new URL(req.url).searchParams.get("itemId");
   if (!itemId) return NextResponse.json({ error: "itemId obrigatório" }, { status: 400 });
 
+  const existing = await prisma.charterItem.findUnique({ where: { id: itemId } });
   await prisma.charterItem.delete({ where: { id: itemId, projectId: id } });
+  if (existing) {
+    await recordAuditLog({ projectId: id, action: "DELETE", entity: "CharterItem", entityId: itemId, field: existing.type, oldValue: existing.text });
+  }
   return NextResponse.json({ ok: true });
 }

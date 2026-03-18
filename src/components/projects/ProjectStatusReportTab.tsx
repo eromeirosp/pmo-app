@@ -19,6 +19,7 @@ import {
   Info,
 } from 'lucide-react';
 import { TabHeader } from "./TabHeader";
+import { StatusLegend } from "@/components/ui/status-legend";
 import { toast } from "sonner";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -340,6 +341,11 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
         />
       </div>
 
+      {/* Status Legend */}
+      <div className="flex justify-end -mt-4">
+        <StatusLegend compact />
+      </div>
+
       {/* Reports History */}
       <section className="grid grid-cols-1 gap-6">
         {/* Most Recent Report */}
@@ -354,7 +360,7 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
                 </div>
                 <div className="flex gap-2 items-center">
                   <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${statusBadgeClass(latest.overallStatus)}`}>
-                    <span className={`w-2 h-2 rounded-full ${statusDotColor(latest.overallStatus)}`}></span> {statusLabel(latest.overallStatus)}
+                    <span className={`w-2 h-2 rounded-full ${statusDotColor(latest.overallStatus)}`} aria-hidden="true"></span> {statusLabel(latest.overallStatus)}
                   </span>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -405,7 +411,7 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
                   <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-3 flex items-center gap-2">
                     <TrendingUp className="text-primary w-5 h-5" /> Progresso Geral
                   </h4>
-                  <div className="w-full bg-slate-200 dark:bg-slate-800 h-3 rounded-full mb-2">
+                  <div className="w-full bg-slate-200 dark:bg-slate-800 h-3 rounded-full mb-2" role="progressbar" aria-valuenow={latest.progress} aria-valuemin={0} aria-valuemax={100} aria-label={`Progresso: ${latest.progress}%`}>
                     <div className="bg-primary h-3 rounded-full transition-all duration-500" style={{ width: `${latest.progress}%` }}></div>
                   </div>
                   <div className="flex justify-between text-xs font-medium">
@@ -471,11 +477,11 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <div className="flex gap-1">
-                  <div className={`w-2 h-2 rounded-full ${statusDotColor(report.overallStatus)}`}></div>
-                  <div className={`w-2 h-2 rounded-full ${statusDotColor(report.scopeStatus)}`}></div>
-                  <div className={`w-2 h-2 rounded-full ${statusDotColor(report.scheduleStatus)}`}></div>
-                  <div className={`w-2 h-2 rounded-full ${statusDotColor(report.budgetStatus)}`}></div>
+                <div className="flex gap-1" role="group" aria-label="Indicadores de saúde">
+                  <div className={`w-2 h-2 rounded-full ${statusDotColor(report.overallStatus)}`} title={`Status Geral: ${report.overallStatus}`} aria-label={`Status Geral: ${report.overallStatus}`} role="img"></div>
+                  <div className={`w-2 h-2 rounded-full ${statusDotColor(report.scopeStatus)}`} title={`Escopo: ${report.scopeStatus}`} aria-label={`Escopo: ${report.scopeStatus}`} role="img"></div>
+                  <div className={`w-2 h-2 rounded-full ${statusDotColor(report.scheduleStatus)}`} title={`Cronograma: ${report.scheduleStatus}`} aria-label={`Cronograma: ${report.scheduleStatus}`} role="img"></div>
+                  <div className={`w-2 h-2 rounded-full ${statusDotColor(report.budgetStatus)}`} title={`Orçamento: ${report.budgetStatus}`} aria-label={`Orçamento: ${report.budgetStatus}`} role="img"></div>
                 </div>
                 <button
                   onClick={() => setExpandedReportId(expandedReportId === report.id ? null : report.id)}

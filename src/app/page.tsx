@@ -6,6 +6,7 @@ import { ProjectCard } from "@/components/projects/ProjectCard";
 import { Project } from "@prisma/client";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { motion } from "framer-motion";
 import { Search, Filter, X, BarChart2 } from "lucide-react";
 import {
   Select,
@@ -18,6 +19,7 @@ import { StatsKPIRow } from "@/components/dashboard/StatsKPIRow";
 import { StatusDonutChart } from "@/components/dashboard/StatusDonutChart";
 import { BudgetBarChart } from "@/components/dashboard/BudgetBarChart";
 import { ProjectsAreaChart } from "@/components/dashboard/ProjectsAreaChart";
+import { StatusLegend } from "@/components/ui/status-legend";
 
 interface StatsData {
   total: number;
@@ -175,6 +177,13 @@ export default function Home() {
           />
         ) : null}
 
+        {/* Status Legend */}
+        {!statsLoading && stats && stats.total > 0 && (
+          <div className="flex justify-end mb-4">
+            <StatusLegend compact />
+          </div>
+        )}
+
         {/* Charts Grid */}
         {statsLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -290,8 +299,15 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProjects.map((project) => (
-              <ProjectCard key={project.id} project={project} />
+            {filteredProjects.map((project, index) => (
+              <motion.div
+                key={project.id}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.04 }}
+              >
+                <ProjectCard project={project} />
+              </motion.div>
             ))}
           </div>
         )}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { User } from "lucide-react";
 import { ThemeToggle } from './ThemeToggle';
+import { NotificationBell } from './NotificationBell';
 import { Button } from "@/components/ui/button";
 import { CreateProjectButton } from "@/components/projects/CreateProjectModal";
 
@@ -18,6 +19,7 @@ export default function Topbar() {
                 </Link>
 
                 <div className="flex items-center gap-3 sm:gap-4">
+                    <NotificationBell />
                     <ThemeToggle />
 
                     <Button variant="ghost" size="icon" className="hidden sm:flex text-muted-foreground hover:text-foreground rounded-full hover:bg-accent/50">

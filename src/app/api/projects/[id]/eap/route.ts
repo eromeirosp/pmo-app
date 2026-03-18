@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { recordAuditLog } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -38,15 +39,17 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const item = await prisma.eAPItem.create({
-      data: { 
-        projectId: id, 
-        name: name.trim(), 
-        description, 
-        parentId, 
+      data: {
+        projectId: id,
+        name: name.trim(),
+        description,
+        parentId,
         status: status || "PENDING",
-        order: finalOrder
+        order: finalOrder,
+        dependsOn: [],
       },
     });
+    await recordAuditLog({ projectId: id, action: "CREATE", entity: "EAPItem", entityId: item.id, newValue: name.trim() });
     return NextResponse.json(item, { status: 201 });
   } catch (error) {
     const err = error as Error;
@@ -59,18 +62,52 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const body = await req.json();
 
-  // Single item update (status, name, description)
+  // Single item update (status, name, description, dependsOn)
   if (body.itemId) {
-    const { itemId, status, name, description } = body;
+    const { itemId, status, name, description, dependsOn } = body;
+    const current = await prisma.eAPItem.findUnique({ where: { id: itemId } });
     const data: Record<string, unknown> = {};
-    if (status !== undefined) data.status = status;
     if (name !== undefined) data.name = name;
     if (description !== undefined) data.description = description;
+    if (dependsOn !== undefined) data.dependsOn = dependsOn;
+
+    // If changing to DONE, validate that all dependencies are DONE
+    if (status !== undefined) {
+      if (status === "DONE") {
+        const item = await prisma.eAPItem.findUnique({ where: { id: itemId } });
+        if (item && item.dependsOn.length > 0) {
+          const deps = await prisma.eAPItem.findMany({
+            where: { id: { in: item.dependsOn }, projectId: id },
+            select: { id: true, name: true, status: true },
+          });
+          const notDone = deps.filter((d) => d.status !== "DONE");
+          if (notDone.length > 0) {
+            return NextResponse.json(
+              {
+                error: "Dependências não concluídas",
+                blockedBy: notDone.map((d) => d.name),
+              },
+              { status: 422 }
+            );
+          }
+        }
+      }
+      data.status = status;
+    }
 
     const updated = await prisma.eAPItem.update({
       where: { id: itemId, projectId: id },
       data,
     });
+    // Audit log for tracked changes
+    if (current) {
+      if (status !== undefined && status !== current.status) {
+        await recordAuditLog({ projectId: id, action: "UPDATE", entity: "EAPItem", entityId: itemId, field: "status", oldValue: current.status, newValue: status });
+      }
+      if (dependsOn !== undefined) {
+        await recordAuditLog({ projectId: id, action: "UPDATE", entity: "EAPItem", entityId: itemId, field: "dependsOn", newValue: JSON.stringify(dependsOn) });
+      }
+    }
     return NextResponse.json(updated);
   }
 
@@ -97,15 +134,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const itemId = new URL(req.url).searchParams.get("itemId");
   if (!itemId) return NextResponse.json({ error: "itemId obrigatório" }, { status: 400 });
 
-  // Prevent deleting if it has children
-  const childrenCount = await prisma.eAPItem.count({
-    where: { projectId: id, parentId: itemId }
-  });
-
-  if (childrenCount > 0) {
-    return NextResponse.json({ error: "Não é possível excluir um item que possui sub-itens. Exclua os sub-itens primeiro." }, { status: 400 });
-  }
-
+  const existing = await prisma.eAPItem.findUnique({ where: { id: itemId } });
   await prisma.eAPItem.delete({ where: { id: itemId, projectId: id } });
+  if (existing) {
+    await recordAuditLog({ projectId: id, action: "DELETE", entity: "EAPItem", entityId: itemId, oldValue: existing.name });
+  }
   return NextResponse.json({ ok: true });
 }
