@@ -60,6 +60,7 @@ interface StatsKPIRowProps {
   red: number;
   totalBudget: number;
   avgBudget: number;
+  avgROI?: number | null;
 }
 
 function formatBRL(value: number) {
@@ -78,45 +79,54 @@ export function StatsKPIRow({
   red,
   totalBudget,
   avgBudget,
+  avgROI,
 }: StatsKPIRowProps) {
   const healthPct = total > 0 ? Math.round((green / total) * 100) : 0;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
-      <KPICard 
-        title="Total de Projetos" 
-        value={total} 
-        icon={<PieChart size={20} />} 
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-5 mb-8">
+      <KPICard
+        title="Total de Projetos"
+        value={total}
+        icon={<PieChart size={20} />}
       />
-      <KPICard 
-        title="No Prazo" 
-        value={green} 
+      <KPICard
+        title="No Prazo"
+        value={green}
         sub={`${healthPct}% do portfólio`}
         trend="Saudável"
         trendUp={true}
-        icon={<CheckCircle2 size={20} />} 
+        icon={<CheckCircle2 size={20} />}
       />
-      <KPICard 
-        title="Em Atenção" 
-        value={yellow} 
+      <KPICard
+        title="Em Atenção"
+        value={yellow}
         sub={total > 0 ? `${Math.round((yellow / total) * 100)}% em risco` : "0%"}
         trend={yellow === 0 ? "Limpo" : "Atenção"}
         trendUp={yellow === 0 ? true : undefined}
-        icon={<AlertCircle size={20} />} 
+        icon={<AlertCircle size={20} />}
       />
-      <KPICard 
-        title="Atrasado" 
-        value={red} 
+      <KPICard
+        title="Atrasado"
+        value={red}
         sub={total > 0 ? `${Math.round((red / total) * 100)}% urgentes` : "0%"}
         trend={red === 0 ? "Limpo" : "Atrasado"}
         trendUp={red === 0 ? true : false}
-        icon={<XCircle size={20} />} 
+        icon={<XCircle size={20} />}
       />
-      <KPICard 
-        title="Orçamento Total" 
-        value={formatBRL(totalBudget)} 
+      <KPICard
+        title="Orçamento Total"
+        value={formatBRL(totalBudget)}
         sub={`Média ${formatBRL(avgBudget)}`}
-        icon={<DollarSign size={20} />} 
+        icon={<DollarSign size={20} />}
+      />
+      <KPICard
+        title="ROI Médio"
+        value={avgROI !== null && avgROI !== undefined ? `${avgROI}%` : "N/A"}
+        sub={avgROI !== null && avgROI !== undefined ? (avgROI > 0 ? "Retorno positivo" : "Retorno negativo") : "Sem dados"}
+        trend={avgROI !== null && avgROI !== undefined ? (avgROI > 0 ? "Positivo" : "Negativo") : undefined}
+        trendUp={avgROI !== null && avgROI !== undefined ? avgROI > 0 : undefined}
+        icon={<TrendingUp size={20} />}
       />
     </div>
   );

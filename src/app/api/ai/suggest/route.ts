@@ -15,7 +15,8 @@ type SuggestType =
   | "risk_suggest"
   | "classification"
   | "eap_suggest"
-  | "closing_suggest";
+  | "closing_suggest"
+  | "cadence_suggest";
 
 const PROMPTS: Record<SuggestType, string> = {
   charter_criteria: `Com base no contexto do projeto abaixo, sugira de 3 a 5 critérios de sucesso MENSURÁVEIS e específicos.
@@ -59,6 +60,18 @@ Crie de 3 a 6 pacotes de trabalho principais (fases), cada um com 2 a 4 sub-paco
 Cada item deve ter: name (nome claro e descritivo) e description (1 frase sobre o escopo).
 
 A estrutura deve seguir boas práticas de PMO: fases lógicas do projeto do início ao encerramento.`,
+
+  cadence_suggest: `Com base no contexto do projeto abaixo, avalie os seguintes rituais/cerimônias de gestão e recomende quais fazem sentido para ESTE projeto específico.
+Princípio: MENOS ritual por padrão. Só recomende o que o contexto do projeto realmente exige.
+Projetos pequenos (< R$50.000) e baixo risco precisam de poucos ritos.
+Projetos AGILE favorecem ritos iterativos. TRADITIONAL favorecem gates formais. HYBRID mistura ambos.
+
+Rituais a avaliar: Daily Standup, Sprint Planning, Sprint Review, Retrospectiva, Weekly Sync, Comitê Diretivo, Gate Review, Lições Aprendidas.
+
+Para cada: name, recommended (true/false), frequency (Diária|Semanal|Quinzenal|Mensal|Por Fase|Ao Final), justification.
+Inclua governanceSummary: resumo de 2-3 frases sobre a filosofia de governança recomendada.
+
+Retorne ESTRITAMENTE um JSON válido: { "governanceSummary": "...", "rituals": [{ "name": "...", "recommended": true, "frequency": "...", "justification": "..." }] }`,
 
   closing_suggest: `Com base no contexto COMPLETO do projeto abaixo (incluindo status reports, EAP, riscos e charter), gere um relatório de encerramento completo.
 
@@ -176,6 +189,7 @@ export async function POST(req: NextRequest) {
     const isClassification = type === "classification";
     const isEap = type === "eap_suggest";
     const isClosing = type === "closing_suggest";
+    const isCadence = type === "cadence_suggest";
 
     let responseFormat: string;
     if (isListType) {
@@ -188,6 +202,8 @@ export async function POST(req: NextRequest) {
       responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "suggestions": [{ "name": "Fase 1 - Nome", "description": "Descrição", "children": [{ "name": "Sub-pacote", "description": "Descrição" }] }] }`;
     } else if (isClosing) {
       responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "summary": "Resumo executivo...", "deliverables": [{ "text": "Entrega X", "status": "concluído|parcial|não entregue" }], "lessons": ["Lição 1", ...], "recommendations": ["Recomendação 1", ...] }`;
+    } else if (isCadence) {
+      responseFormat = ""; // Already included in the prompt
     } else {
       responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "accomplishments": "...", "nextSteps": "...", "issues": "..." }`;
     }

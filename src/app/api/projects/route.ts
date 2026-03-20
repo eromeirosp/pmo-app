@@ -19,6 +19,8 @@ export async function POST(req: NextRequest) {
             preliminaryTimeline,
             milestones,
             successCriteria,
+            expectedReturn,
+            cadence,
             initialRisks,
         } = data;
 
@@ -38,6 +40,7 @@ export async function POST(req: NextRequest) {
                 budget: parseFloat(budget),
                 stakeholders,
                 classification,
+                expectedReturn: expectedReturn ? parseFloat(expectedReturn) : null,
                 problems,
                 returns,
                 impacts,
@@ -58,7 +61,11 @@ export async function POST(req: NextRequest) {
                         {
                             type: "RISCOS_INICIAIS",
                             content: { items: initialRisks },
-                        }
+                        },
+                        ...(cadence ? [{
+                            type: "CADENCE_RITUALS",
+                            content: cadence,
+                        }] : []),
                     ],
                 },
                 risks: {

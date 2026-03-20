@@ -43,6 +43,22 @@ Analise os dados do projeto abaixo e retorne ESTRITAMENTE um JSON válido.
 
 **initialRisks**: Array de 3-5 riscos com campos: description (texto descritivo), probability (1 a 5), impact (1 a 5), category (Técnico|Organizacional|Externo|Financeiro|Gerenciamento de Projeto), mitigation (estratégia de mitigação concreta).
 
+**expectedReturn**: Analise o campo "Retornos Esperados" e extraia ou estime um valor monetário numérico em reais representando o retorno financeiro esperado do projeto.
+Regras de estimativa:
+1. Se houver valor monetário explícito no texto (ex: "economia de R$ 200.000/ano"), use esse valor.
+2. Se não houver valor explícito, estime com base no orçamento e natureza do projeto:
+   - **Infraestrutura/TI** (migração, atualização, rede): 1.2x-2x o orçamento (economia operacional)
+   - **Eficiência/Processo** (automação, otimização, redução de custo): 1.5x-3x o orçamento
+   - **Inovação/Produto** (novo produto, novo mercado, transformação digital): 2x-5x o orçamento
+   - **Compliance/Obrigatório** (regulatório, segurança, legal): 1x o orçamento (evitar perdas/multas)
+3. Quando estimar, mencione brevemente o racional no campo businessCase.
+Retorne apenas o número sem formatação. Se impossível estimar, retorne 0.
+
+**cadence**: Avalie os seguintes 8 rituais/cerimônias de gestão e recomende quais fazem sentido para ESTE projeto específico. Marque cada um como recommended: true ou false. Princípio: MENOS ritual por padrão. Só recomende o que o contexto do projeto realmente exige. Projetos pequenos (< R$50.000) e baixo risco precisam de poucos ritos. Projetos AGILE favorecem ritos iterativos. Projetos TRADITIONAL favorecem gates formais. HYBRID mistura ambos.
+Rituais a avaliar: Daily Standup, Sprint Planning, Sprint Review, Retrospectiva, Weekly Sync, Comitê Diretivo, Gate Review, Lições Aprendidas.
+Para cada um: name (nome do ritual), recommended (true/false), frequency (Diária|Semanal|Quinzenal|Mensal|Por Fase|Ao Final), justification (por que sim ou por que não para este projeto).
+Inclua também governanceSummary: um resumo de 2-3 frases explicando a filosofia de governança recomendada para este projeto.
+
 ## Estrutura JSON esperada:
 {
   "classification": "TRADITIONAL" | "AGILE" | "HYBRID",
@@ -51,6 +67,14 @@ Analise os dados do projeto abaixo e retorne ESTRITAMENTE um JSON válido.
   "preliminaryTimeline": "Fase 1 - Nome (duração): descrição. Fase 2 - ...",
   "milestones": ["Marco 1", "Marco 2", "Marco 3", "Marco 4"],
   "successCriteria": ["Critério mensurável 1", "Critério mensurável 2"],
+  "expectedReturn": 150000,
+  "cadence": {
+    "governanceSummary": "Resumo da filosofia de governança...",
+    "rituals": [
+      { "name": "Daily Standup", "recommended": true, "frequency": "Diária", "justification": "Motivo..." },
+      { "name": "Comitê Diretivo", "recommended": false, "frequency": "Mensal", "justification": "Motivo..." }
+    ]
+  },
   "initialRisks": [
     { "description": "Descrição do risco", "probability": 3, "impact": 4, "category": "Técnico", "mitigation": "Estratégia de mitigação" }
   ]

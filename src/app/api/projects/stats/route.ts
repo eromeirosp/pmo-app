@@ -10,6 +10,7 @@ export async function GET() {
         status: true,
         classification: true,
         budget: true,
+        expectedReturn: true,
         manager: true,
         createdAt: true,
       },
@@ -74,6 +75,29 @@ export async function GET() {
       projetos: count,
     }));
 
+    // ROI metrics
+    const projectsWithROI = projects.filter(
+      (p) => p.expectedReturn && p.budget > 0
+    );
+    const avgROI =
+      projectsWithROI.length > 0
+        ? projectsWithROI.reduce((sum, p) => {
+            const roi = ((p.expectedReturn! - p.budget) / p.budget) * 100;
+            return sum + roi;
+          }, 0) / projectsWithROI.length
+        : null;
+
+    const topByROI = [...projectsWithROI]
+      .map((p) => ({
+        name:
+          p.name.length > 22 ? p.name.substring(0, 22) + "…" : p.name,
+        roi: Math.round(((p.expectedReturn! - p.budget) / p.budget) * 100),
+        budget: p.budget,
+        status: p.status,
+      }))
+      .sort((a, b) => b.roi - a.roi)
+      .slice(0, 5);
+
     return NextResponse.json({
       total: projects.length,
       statusCounts,
@@ -82,6 +106,9 @@ export async function GET() {
       avgBudget,
       topByBudget,
       projectsPerMonth,
+      avgROI: avgROI !== null ? Math.round(avgROI) : null,
+      topByROI,
+      projectsWithROICount: projectsWithROI.length,
     });
   } catch (error) {
     console.error("[stats] Error:", error);

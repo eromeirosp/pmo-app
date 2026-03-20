@@ -5,6 +5,20 @@ import { z } from "zod";
  * Cada schema corresponde a um tipo de resposta esperada.
  */
 
+// --- Cadência / Rituais ---
+
+export const RitualSchema = z.object({
+  name: z.string().min(1),
+  recommended: z.boolean(),
+  frequency: z.string().min(1),
+  justification: z.string().min(1),
+});
+
+export const CadenceSchema = z.object({
+  rituals: z.array(RitualSchema).min(1),
+  governanceSummary: z.string().min(1),
+});
+
 // --- Criação de Projeto (/api/ai) ---
 
 export const ProjectCreationSchema = z.object({
@@ -14,6 +28,8 @@ export const ProjectCreationSchema = z.object({
   preliminaryTimeline: z.string().min(1),
   milestones: z.array(z.string()).min(1),
   successCriteria: z.array(z.string()).min(1),
+  expectedReturn: z.number().min(0).default(0),
+  cadence: CadenceSchema,
   initialRisks: z.array(
     z.object({
       description: z.string().min(1),
@@ -99,4 +115,5 @@ export const SUGGEST_SCHEMAS: Record<string, z.ZodType> = {
   classification: ClassificationSuggestSchema,
   eap_suggest: EapSuggestionsSchema,
   closing_suggest: ClosingSuggestionsSchema,
+  cadence_suggest: CadenceSchema,
 };

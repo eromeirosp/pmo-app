@@ -29,6 +29,9 @@ interface StatsData {
   avgBudget: number;
   topByBudget: { name: string; budget: number; status: string }[];
   projectsPerMonth: { month: string; projetos: number }[];
+  avgROI: number | null;
+  topByROI: { name: string; roi: number; budget: number; status: string }[];
+  projectsWithROICount: number;
 }
 
 function ChartCard({
@@ -149,6 +152,15 @@ export default function Home() {
       result.sort((a, b) => a.name.localeCompare(b.name));
     } else if (filterSort === "za") {
       result.sort((a, b) => b.name.localeCompare(a.name));
+    } else if (filterSort === "roi-desc" || filterSort === "roi-asc") {
+      const getROI = (p: Project) => {
+        const er = (p as Project & { expectedReturn?: number | null }).expectedReturn;
+        if (!er || p.budget <= 0) return -Infinity;
+        return ((er - p.budget) / p.budget) * 100;
+      };
+      result.sort((a, b) =>
+        filterSort === "roi-desc" ? getROI(b) - getROI(a) : getROI(a) - getROI(b)
+      );
     }
 
     return result;
@@ -161,8 +173,8 @@ export default function Home() {
       <main className="flex-1 container mx-auto px-4 md:px-6 py-8 lg:max-w-7xl">
         {/* KPI Row */}
         {statsLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-            {[...Array(5)].map((_, i) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+            {[...Array(6)].map((_, i) => (
               <Skeleton key={i} className="h-[120px] rounded-2xl bg-muted/20" />
             ))}
           </div>
@@ -174,6 +186,7 @@ export default function Home() {
             red={stats.statusCounts.RED}
             totalBudget={stats.totalBudget}
             avgBudget={stats.avgBudget}
+            avgROI={stats.avgROI}
           />
         ) : null}
 
@@ -251,6 +264,8 @@ export default function Home() {
                 <SelectItem value="oldest">Antigos</SelectItem>
                 <SelectItem value="az">A-Z</SelectItem>
                 <SelectItem value="za">Z-A</SelectItem>
+                <SelectItem value="roi-desc">Maior ROI</SelectItem>
+                <SelectItem value="roi-asc">Menor ROI</SelectItem>
               </SelectContent>
             </Select>
           </div>

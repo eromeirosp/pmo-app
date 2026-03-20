@@ -91,6 +91,8 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
         preliminaryTimeline: aiResult.preliminaryTimeline,
         milestones: aiResult.milestones,
         successCriteria: aiResult.successCriteria,
+        expectedReturn: aiResult.expectedReturn,
+        cadence: aiResult.cadence,
         initialRisks: aiResult.initialRisks,
       };
 
