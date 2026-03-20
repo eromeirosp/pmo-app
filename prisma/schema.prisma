@@ -29,6 +29,7 @@ model Project {
   charterApprovedAt  DateTime?
   statusOverride       String?
   statusOverrideReason String?
+  expectedReturn   Float?
   endDate          DateTime?
   startDate        DateTime?
   artifacts        Artifact[]
@@ -173,6 +174,21 @@ model Notification {
   message   String
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+model Ticket {
+  id            String   @id @default(uuid())
+  userName      String
+  userEmail     String?
+  type          String   // BUG | IMPROVEMENT | FEATURE
+  description   String
+  screenshotUrl String?
+  currentPath   String
+  status        String   @default("Backlog")
+  likes         String[] @default([])
+  comments      Json     @default("[]")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model AuditLog {

@@ -20,3 +20,8 @@ export function parseLocalDate(dateStr: string | Date): Date {
   }
   return new Date(dateStr);
 }
+
+export function calculateROI(budget: number, expectedReturn: number | null | undefined): number | null {
+  if (!expectedReturn || budget <= 0) return null;
+  return ((expectedReturn - budget) / budget) * 100;
+}

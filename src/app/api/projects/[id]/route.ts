@@ -110,6 +110,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             budget: data.budget ? parseFloat(data.budget.toString().replace(/[^\d.]/g, '')) : undefined,
             startDate: data.startDate ? new Date(data.startDate + 'T00:00:00.000Z') : undefined,
             endDate: data.endDate ? new Date(data.endDate + 'T00:00:00.000Z') : undefined,
+            ...(data.expectedReturn !== undefined && {
+                expectedReturn: data.expectedReturn ? parseFloat(String(data.expectedReturn).replace(/[^\d.]/g, '')) : null,
+            }),
         };
 
         if (typeof data.charterApproved === "boolean") {
@@ -140,6 +143,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         // Budget (compare as numbers)
         if (currentProject.budget !== updatedProject.budget) {
             await recordAuditLog({ projectId: id, action: "UPDATE", entity: "Project", entityId: id, field: "budget", oldValue: String(currentProject.budget), newValue: String(updatedProject.budget) });
+        }
+        // Expected Return (compare as numbers)
+        if (currentProject.expectedReturn !== updatedProject.expectedReturn) {
+            await recordAuditLog({ projectId: id, action: "UPDATE", entity: "Project", entityId: id, field: "expectedReturn", oldValue: String(currentProject.expectedReturn ?? ""), newValue: String(updatedProject.expectedReturn ?? "") });
         }
 
         return NextResponse.json(updatedProject, { status: 200 });

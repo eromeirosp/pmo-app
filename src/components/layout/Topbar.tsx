@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { User } from "lucide-react";
+import { User, MessageSquarePlus } from "lucide-react";
 import { ThemeToggle } from './ThemeToggle';
 import { NotificationBell } from './NotificationBell';
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,13 @@ export default function Topbar() {
                 </Link>
 
                 <div className="flex items-center gap-3 sm:gap-4">
+                    <Link
+                        href="/feedback"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-accent/30 text-[12px] font-bold text-muted-foreground hover:text-primary hover:border-primary/30 transition-all"
+                    >
+                        <MessageSquarePlus className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Feedback</span>
+                    </Link>
                     <NotificationBell />
                     <ThemeToggle />
 

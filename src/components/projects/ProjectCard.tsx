@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { User, Calendar, DollarSign, Building2, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
-import { parseLocalDate } from "@/lib/utils";
+import { User, Calendar, DollarSign, Building2, CheckCircle2, AlertTriangle, XCircle, TrendingUp } from "lucide-react";
+import { parseLocalDate, calculateROI } from "@/lib/utils";
 
 interface EAPItemSlim {
     id: string;
@@ -17,6 +17,7 @@ interface ProjectCardProject {
     impacts?: string | null;
     department?: string | null;
     endDate?: string | Date | null;
+    expectedReturn?: number | null;
     eapItems?: EAPItemSlim[];
 }
 
@@ -42,6 +43,8 @@ export function ProjectCard({ project }: ProjectCardProps) {
     const totalItems = eapItems.length;
     const doneItems = eapItems.filter((i) => i.status === "DONE").length;
     const progressPct = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
+
+    const roi = calculateROI(project.budget, project.expectedReturn);
 
     const formattedEndDate = project.endDate
         ? new Intl.DateTimeFormat('pt-BR', { month: 'short', year: 'numeric' }).format(parseLocalDate(project.endDate))
@@ -98,7 +101,15 @@ export function ProjectCard({ project }: ProjectCardProps) {
                         </li>
                         <li className="flex items-center gap-2.5 text-muted-foreground">
                             <DollarSign className="h-3.5 w-3.5 text-primary shrink-0" />
-                            <span className="text-[12px] font-medium truncate">{formattedBudget}</span>
+                            <span className="text-[12px] font-medium truncate">
+                                {formattedBudget}
+                                {roi !== null && (
+                                    <span className={`ml-1.5 inline-flex items-center gap-0.5 text-[10px] font-bold ${roi > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                        <TrendingUp className="h-2.5 w-2.5" />
+                                        {Math.round(roi)}%
+                                    </span>
+                                )}
+                            </span>
                         </li>
                         <li className="flex items-center gap-2.5 text-muted-foreground">
                             <Calendar className="h-3.5 w-3.5 text-primary shrink-0" />

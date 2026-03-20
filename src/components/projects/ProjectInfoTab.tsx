@@ -7,9 +7,12 @@ import {
   ArrowRight,
   Info,
   Sparkles,
-  Loader2
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
 } from "lucide-react";
-import { cn, parseLocalDate } from "@/lib/utils";
+import { cn, parseLocalDate, calculateROI } from "@/lib/utils";
 import { toast } from "sonner";
 import { TabHeader } from "./TabHeader";
 
@@ -28,6 +31,18 @@ function InputWrapper({ label, children, fullWidth = false }: { label: string; c
   );
 }
 
+interface Ritual {
+  name: string;
+  recommended: boolean;
+  frequency: string;
+  justification: string;
+}
+
+interface CadenceData {
+  governanceSummary: string;
+  rituals: Ritual[];
+}
+
 interface ProjectInfoTabProps {
   project: {
     id: string;
@@ -39,9 +54,11 @@ interface ProjectInfoTabProps {
     classification?: string | null;
     status?: string | null;
     budget?: number | string | null;
+    expectedReturn?: number | null;
     startDate?: string | Date | null;
     endDate?: string | Date | null;
     computedStatus?: string | null;
+    artifacts?: Array<{ type: string; content: unknown }>;
   };
   saveTrigger?: number;
 }
@@ -56,6 +73,7 @@ export function ProjectInfoTab({ project, saveTrigger }: ProjectInfoTabProps) {
     classification: project.classification || "TRADITIONAL",
     status: project.status || "ACTIVE",
     budget: project.budget?.toString() || "",
+    expectedReturn: project.expectedReturn?.toString() || "",
     startDate: project.startDate ? parseLocalDate(project.startDate).toISOString().split('T')[0] : "2025-10-01",
     endDate: project.endDate ? parseLocalDate(project.endDate).toISOString().split('T')[0] : "2026-06-30",
   });
@@ -65,6 +83,32 @@ export function ProjectInfoTab({ project, saveTrigger }: ProjectInfoTabProps) {
   const [loading, setLoading] = useState(false);
   const [aiSuggesting, setAiSuggesting] = useState(false);
   const [aiClassification, setAiClassification] = useState<{ classification: string; justification: string } | null>(null);
+  const [cadenceSuggesting, setCadenceSuggesting] = useState(false);
+
+  // Extract cadence data from artifacts
+  const cadenceArtifact = project.artifacts?.find((a) => a.type === "CADENCE_RITUALS");
+  const [cadenceData, setCadenceData] = useState<CadenceData | null>(
+    cadenceArtifact ? (cadenceArtifact.content as CadenceData) : null
+  );
+
+  const handleSuggestCadence = async () => {
+    setCadenceSuggesting(true);
+    try {
+      const res = await fetch("/api/ai/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: project.id, type: "cadence_suggest" }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setCadenceData(data);
+      toast.success("Cadência atualizada pela IA.");
+    } catch {
+      toast.error("Erro ao obter sugestão de cadência.");
+    } finally {
+      setCadenceSuggesting(false);
+    }
+  };
 
   const handleSuggestClassification = async () => {
     setAiSuggesting(true);
@@ -318,6 +362,36 @@ export function ProjectInfoTab({ project, saveTrigger }: ProjectInfoTabProps) {
               />
             </div>
           </InputWrapper>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Retorno Esperado (R$)</label>
+            <div className="relative group">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">R$</span>
+                <input
+                  type="text"
+                  value={formData.expectedReturn}
+                  onChange={(e) => setFormData({ ...formData, expectedReturn: e.target.value })}
+                  className={cn(inputClasses, "pl-10")}
+                  placeholder="Valor estimado de retorno"
+                />
+              </div>
+              {(() => {
+                const budgetNum = parseFloat(String(formData.budget).replace(/[^\d.]/g, ''));
+                const returnNum = parseFloat(String(formData.expectedReturn).replace(/[^\d.]/g, ''));
+                const roi = calculateROI(budgetNum, returnNum);
+                if (roi === null) return null;
+                return (
+                  <div className={cn(
+                    "mt-1.5 text-xs font-bold px-2 py-1 rounded-md inline-flex items-center gap-1",
+                    roi > 0 ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20" : "text-rose-600 bg-rose-50 dark:bg-rose-900/20"
+                  )}>
+                    ROI: {Math.round(roi)}%
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
         </div>
 
         {/* Footer Actions */}
@@ -338,6 +412,83 @@ export function ProjectInfoTab({ project, saveTrigger }: ProjectInfoTabProps) {
           </button>
         </div>
       </form>
+
+      {/* Cadência e Rituais Recomendados */}
+      <div className="mt-8 bg-card dark:bg-slate-900/80 border border-border dark:border-white/10 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:ring-1 dark:ring-white/5 overflow-hidden">
+        <div className="p-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                Cadência e Rituais Recomendados
+              </h3>
+              {cadenceData?.governanceSummary && (
+                <p className="text-sm text-muted-foreground italic mt-2 max-w-3xl">
+                  {cadenceData.governanceSummary}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleSuggestCadence}
+              disabled={cadenceSuggesting}
+              className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors cursor-pointer disabled:opacity-50 px-3 py-1.5 rounded-lg bg-primary/5 hover:bg-primary/10"
+            >
+              {cadenceSuggesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              {cadenceData ? "Regenerar" : "Sugerir Cadência"}
+            </button>
+          </div>
+
+          {cadenceData?.rituals && cadenceData.rituals.length > 0 ? (
+            <div className="space-y-3">
+              {cadenceData.rituals.map((ritual, idx) => (
+                <div
+                  key={idx}
+                  className={cn(
+                    "flex items-start gap-3 p-4 rounded-xl border transition-colors",
+                    ritual.recommended
+                      ? "bg-emerald-50/50 border-emerald-200/50 dark:bg-emerald-950/20 dark:border-emerald-800/30"
+                      : "bg-slate-50/50 border-slate-200/50 dark:bg-slate-800/20 dark:border-slate-700/30 opacity-60"
+                  )}
+                >
+                  {ritual.recommended ? (
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-slate-400 shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={cn(
+                        "text-sm font-bold",
+                        ritual.recommended
+                          ? "text-slate-900 dark:text-slate-100"
+                          : "text-slate-500 dark:text-slate-400 line-through"
+                      )}>
+                        {ritual.name}
+                      </span>
+                      <span className={cn(
+                        "text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider",
+                        ritual.recommended
+                          ? "bg-primary/10 text-primary"
+                          : "bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400"
+                      )}>
+                        {ritual.frequency}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {ritual.justification}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <p className="text-sm">Nenhuma recomendação de cadência disponível.</p>
+              <p className="text-xs mt-1">Clique em &quot;Sugerir Cadência&quot; para gerar recomendações com IA.</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
