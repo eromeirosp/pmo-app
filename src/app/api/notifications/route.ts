@@ -5,11 +5,18 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
         const unreadOnly = searchParams.get("unread") === "true";
+        const typeFilter = searchParams.get("type");
+        const limitParam = searchParams.get("limit");
+        const take = limitParam ? Math.min(parseInt(limitParam, 10) || 50, 100) : 50;
+
+        const where: Record<string, unknown> = {};
+        if (unreadOnly) where.read = false;
+        if (typeFilter) where.type = typeFilter;
 
         const notifications = await prisma.notification.findMany({
-            where: unreadOnly ? { read: false } : {},
+            where,
             orderBy: { createdAt: "desc" },
-            take: 50,
+            take,
         });
 
         const unreadCount = await prisma.notification.count({ where: { read: false } });

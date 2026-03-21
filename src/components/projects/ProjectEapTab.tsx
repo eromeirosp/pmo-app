@@ -5,8 +5,7 @@ import { TabHeader } from "./TabHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from 'sonner';
 import { parseLocalDate } from "@/lib/utils";
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { createPdfDoc, addTable, savePdf } from "@/lib/pdf-utils";
 
 type EapItem = {
   id: string;
@@ -345,15 +344,10 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
     }
 
     try {
-      const doc = new jsPDF();
-
-      doc.setFontSize(18);
-      doc.text("Estrutura Analítica do Projeto (EAP)", 14, 22);
-
-      doc.setFontSize(11);
-      doc.setTextColor(100);
-      doc.text(`Projeto ID: ${projectId}`, 14, 30);
-      doc.text(`Data de Exportação: ${new Date().toLocaleDateString('pt-BR')}`, 14, 35);
+      const { doc, startY } = createPdfDoc({
+        title: "Estrutura Analítica do Projeto (EAP)",
+        projectId,
+      });
 
       const tableData = items.map(item => {
         const depNames = item.dependsOn
@@ -369,38 +363,9 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
         ];
       });
 
-      autoTable(doc, {
-        startY: 45,
-        head: [["Nome", "Descrição", "Dependências", "Status", "Criado em"]],
-        body: tableData,
-        headStyles: { fillColor: [201, 163, 85], textColor: [255, 255, 255] },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        margin: { top: 45 },
-        styles: { cellPadding: 3 },
-      });
+      addTable(doc, startY, [["Nome", "Descrição", "Dependências", "Status", "Criado em"]], tableData);
 
-      const filename = `EAP_Projeto_${projectId}.pdf`;
-      const pdfData = doc.output('arraybuffer');
-      const blob = new Blob([pdfData], { type: 'application/pdf' });
-
-      if ('showSaveFilePicker' in window) {
-        const handle = await (window as unknown as { showSaveFilePicker: (opts: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker({
-          suggestedName: filename,
-          types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }],
-        });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-      } else {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 10000);
-      }
+      await savePdf(doc, `EAP_Projeto_${projectId}.pdf`);
       toast.success("PDF gerado com sucesso!");
     } catch (error) {
       console.error("PDF generation failed:", error);

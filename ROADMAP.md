@@ -2,7 +2,7 @@
 
 > Este documento serve como fonte de verdade para qualquer LLM, dev ou colaborador que trabalhe neste projeto.
 > Sempre consulte este arquivo antes de tomar decisoes de implementacao.
-> Ultima atualizacao: 2026-03-18
+> Ultima atualizacao: 2026-03-21
 
 ---
 
@@ -68,10 +68,11 @@ pmo-app/
 │   │   ├── error.tsx              # Error boundary global
 │   │   ├── loading.tsx            # Loading state global
 │   │   ├── not-found.tsx          # Pagina 404
+│   │   ├── feedback/page.tsx       # Board de feedbacks/tickets
 │   │   ├── projects/
 │   │   │   ├── new/page.tsx       # Formulario de criacao (7 perguntas + IA)
 │   │   │   └── [id]/
-│   │   │       ├── page.tsx       # Pagina de projeto com 7 abas
+│   │   │       ├── page.tsx       # Pagina de projeto com 8 abas
 │   │   │       └── documents/page.tsx # Central de documentos (legado)
 │   │   └── api/
 │   │       ├── projects/route.ts               # GET lista + POST criacao com IA
@@ -82,17 +83,24 @@ pmo-app/
 │   │       ├── projects/[id]/eap/route.ts
 │   │       ├── projects/[id]/risks/route.ts
 │   │       ├── projects/[id]/status-reports/route.ts
+│   │       ├── projects/[id]/budget/route.ts    # Lancamentos de orcamento
 │   │       ├── projects/[id]/closing/route.ts
+│   │       ├── projects/[id]/versions/route.ts  # Snapshots de versao
 │   │       ├── projects/[id]/audit-logs/route.ts
 │   │       ├── projects/stats/route.ts          # KPIs do dashboard
 │   │       ├── ai/route.ts                      # Analise IA principal (Gemini)
 │   │       ├── ai/suggest/route.ts              # Sugestoes contextuais IA
 │   │       ├── artifacts/route.ts               # CRUD artefatos com versionamento
+│   │       ├── notifications/route.ts           # Notificacoes
+│   │       ├── tickets/route.ts                 # GET + POST feedback tickets
+│   │       ├── tickets/[id]/route.ts            # PATCH status/likes + DELETE
+│   │       ├── tickets/[id]/comment/route.ts    # POST comentarios
 │   │       ├── cron/route.ts                    # Alertas automaticos (stub)
 │   │       └── webhooks/route.ts                # Integracoes externas (stub)
 │   ├── components/
 │   │   ├── layout/
 │   │   │   ├── Topbar.tsx
+│   │   │   ├── NotificationBell.tsx    # Sino de notificacoes com polling
 │   │   │   └── ThemeToggle.tsx
 │   │   ├── projects/
 │   │   │   ├── ProjectCard.tsx
@@ -106,8 +114,15 @@ pmo-app/
 │   │   │   ├── ProjectRiskTab.tsx
 │   │   │   ├── ProjectStatusReportTab.tsx
 │   │   │   ├── ProjectEncerramentoTab.tsx
+│   │   │   ├── ProjectBudgetTab.tsx
 │   │   │   ├── CreateProjectModal.tsx
-│   │   │   └── ProjectAuditModal.tsx
+│   │   │   ├── ProjectAuditModal.tsx
+│   │   │   ├── ProjectVersionHistory.tsx  # Historico + rollback de versoes
+│   │   │   └── MeetingTranscriptModal.tsx # Transcricao de reuniao → IA
+│   │   ├── feedback/
+│   │   │   ├── FeedbackWidget.tsx       # Widget flutuante (Ctrl+V screenshot)
+│   │   │   ├── FeedbackCard.tsx         # Card com badges, likes, comments
+│   │   │   └── FeedbackDetailModal.tsx  # Modal com status, likes, thread
 │   │   ├── dashboard/
 │   │   │   ├── StatsKPIRow.tsx
 │   │   │   ├── StatusDonutChart.tsx
@@ -120,21 +135,26 @@ pmo-app/
 │       ├── utils.ts               # cn() + parseLocalDate()
 │       ├── audit.ts               # Funcao de audit logging
 │       ├── ai-sanitize.ts         # Sanitizacao de inputs para prompts IA
-│       └── ai-schemas.ts          # Schemas Zod para validacao de respostas IA
+│       ├── ai-schemas.ts          # Schemas Zod para validacao de respostas IA
+│       └── __tests__/             # Testes unitarios (Vitest)
+│           ├── ai-sanitize.test.ts
+│           └── utils.test.ts
 ├── public/
+│   └── uploads/tickets/           # Screenshots de feedback (local only)
 ├── .env.example
 ├── package.json
 ├── tsconfig.json
 ├── tailwind.config.ts
 ├── next.config.ts
 ├── components.json
+├── vitest.config.ts
 ├── README.md
 └── ROADMAP.md
 ```
 
 ---
 
-## 4. MODELO DE DADOS (PRISMA) — 10 TABELAS + AUDITLOG
+## 4. MODELO DE DADOS (PRISMA) — 14 TABELAS
 
 ```prisma
 model Project {
@@ -182,6 +202,9 @@ model ProjectVersion { id, projectId, snapshotData (Json), createdAt }
 model EAPItem       { id, projectId, name, description?, parentId?, status, order (Float), createdAt, updatedAt }
 model Risk          { id, projectId, title, description, probability (Int 1-5), impact (Int 1-5), level, status, category, mitigation?, contingency?, responsible?, createdAt, updatedAt }
 model StatusReport  { id, projectId, period, reportDate, overallStatus, scopeStatus, scheduleStatus, budgetStatus, progress (Float), budgetSpent?, accomplishments?, nextSteps?, issues?, createdAt, updatedAt }
+model BudgetEntry   { id, projectId, description, amount (Float), type (COST|REVENUE), category?, date, createdAt }
+model Notification  { id, projectId?, type, title, message, read (Boolean), createdAt }
+model Ticket        { id, type (BUG|IMPROVEMENT|FEATURE), title, description, status, page?, screenshot?, author?, likes (String[]), comments (Json), createdAt, updatedAt }
 model AuditLog      { id, projectId, userId?, userName?, action, entity, entityId?, field?, oldValue?, newValue?, createdAt }
 ```
 
@@ -312,19 +335,34 @@ O risco e classificado pelo score = Probabilidade (1-5) x Impacto (1-5):
 - [x] Charter como gate para EAP (charterApproved + bloqueio UI + botao aprovar/revogar)
 - [x] EAP hierarquica visual (arvore com indent, parent selection, buildTree + depth)
 - [x] Override de status com justificativa (popover no header, campos statusOverride + statusOverrideReason no banco)
+- [x] Aba Orcamento: CRUD de lancamentos (BudgetEntry), calculo de gasto vs aprovado
+- [x] ROI editavel (retorno esperado vs orcamento) com badge colorido
+- [x] Sistema de feedback/tickets: board com filtros, widget flutuante (Ctrl+V screenshot), likes, comentarios, status workflow
+- [x] Sugestoes IA para cadencia/rituais de governanca
+- [x] Testes unitarios iniciais (Vitest) para ai-sanitize e utils
+- [x] Transcricao de reuniao via IA (MeetingTranscriptModal + endpoint meeting_transcript — extrai status reports, stakeholders, EAP, riscos)
+- [x] Historico de versoes com rollback (ProjectVersionHistory.tsx — timeline, expand/collapse, restore com confirmacao)
+- [x] Notificacoes in-app — backend (NotificationBell.tsx com polling 60s, mark-as-read, mark-all-read; API GET/PATCH)
+- [x] Cron de alertas automaticos (3 tipos: projetos parados 7d, riscos materializados, budget warning — deduplicacao 24h)
+- [x] Legenda visual acessivel para status semaforo (StatusLegend component com aria-labels)
 
 ### ⬜ Incompleto / Precisa evolucao
-- [ ] Budget tracking — budgetSpent e manual, sem sistema de lancamentos
-- [ ] Versionamento — ProjectVersion existe mas sem UI de historico/rollback
-- [ ] Cron/alertas — logica existe mas so loga no console
-- [ ] Acessibilidade — criticidade depende apenas de cor (faltam icones, labels, legendas)
+- [x] Upload de screenshots — ja usa base64 data URI direto no banco (sem writeFile)
+- [x] Versionamento — ProjectVersionHistory.tsx completo com rollback
+- [x] Cron/alertas — 3 tipos de alerta funcionais (stalled, risk, budget) com deduplicacao
+- [x] Acessibilidade parcial — StatusLegend com aria-labels implementado; faltam icones/labels em outros contextos
+- [x] PDF Status Report — completo com narrativa (accomplishments, nextSteps, issues)
+- [x] PDF Charter — export funcional com 4 secoes
+- [x] Stakeholders — CRUD completo na aba Pre-Projeto (nome, papel, email, interesse, influencia, edicao inline)
+- [x] Type safety — zero `as any` casts no codebase (verificado 21/03)
+- [x] NotificationBell — completo e montado no Topbar (polling 60s, mark-as-read)
 
 ### ⬜ Ausente (precisa implementar)
 - [ ] Autenticacao (email/senha via NextAuth.js)
 - [ ] Modelo User no banco
 - [ ] Assinatura digital de documentos
-- [ ] Notificacoes push in-app
-- [ ] Testes automatizados
+- [x] Notificacoes in-app (implementado: NotificationBell + API + Cron alertas)
+- [ ] Testes automatizados (cobertura de rotas e componentes)
 - [ ] CI/CD (GitHub Actions)
 
 ---
@@ -336,8 +374,8 @@ O risco e classificado pelo score = Probabilidade (1-5) x Impacto (1-5):
 | Auth | NextAuth.js + Credentials (email/senha) | Simples, sem SSO necessario por enquanto |
 | Banco dev | Neon.tech free tier | Nao congela projetos inativos (Supabase congela) |
 | Deploy | Vercel | Sem restricao da AIR por enquanto |
-| IA principal | Gemini 2.5 Flash | Coberto pela API gratuita |
-| IA fallback | Gemini 2.5 Pro | Para quando o modelo principal falhar |
+| IA principal | Gemini 2.5 Pro | Modelo mais capaz, usado como primeira tentativa |
+| IA fallback | Gemini 2.5 Flash | Fallback rapido quando Pro falha ou atinge quota |
 | Design | Figma como referencia final | URL: https://www.figma.com/make/Lodp4YbQbtwVNUxD76QTX1/Project-Management-App |
 | Idioma do app | pt-BR hardcoded | Sem necessidade de i18n por enquanto |
 | Status de risco | PT-BR padrao | "Identificado", "Em Monitoramento", "Ocorrido", "Encerrado" |
@@ -398,24 +436,75 @@ O risco e classificado pelo score = Probabilidade (1-5) x Impacto (1-5):
 - [x] EAP hierarquica visual (arvore com indent, parent selection, buildTree + depth)
 - [x] Override de status com justificativa (popover no header + statusOverride/statusOverrideReason no banco)
 
-### FASE 3 — UX/UI e Acessibilidade (proxima)
-> Alinhar com Figma, resolver acessibilidade, polimento visual.
+### FASE 3.1 — Estabilizacao + Quick Wins ✅ (Concluida 21/03/2026)
+> Correcao de bugs reportados, fixes de producao, melhorias rapidas de export.
 
+- [x] Fix bug POST /api/tickets 500 (verificado 21/03: codigo limpo, sem bug identificado)
+- [x] Fix upload screenshots para Vercel (ja usa screenshotBase64 como data URI direto no banco — sem writeFile)
+- [x] Fix type safety `(project as any).charterApproved` (verificado 21/03: zero `as any` no codebase)
+- [x] PDF export no Charter (handleExport com 4 secoes: criterios, entregas, premissas, restricoes)
+- [x] PDF Status Report completo (inclui narrativa: accomplishments, nextSteps, issues por periodo)
 - [ ] Revisao de alinhamento com Figma (todas as telas)
 - [ ] Sistema de icones + labels para status (alem de cor) — acessibilidade
-- [ ] Legenda visual para estados/criticidade
-- [ ] Budget tracking com sistema de lancamentos
-- [ ] UI de historico/rollback de versoes
-- [ ] Cron/alertas funcionais (notificacoes in-app)
+- [x] Legenda visual para estados/criticidade (StatusLegend component com aria-labels)
 
-### FASE 4 — Formalizacao / Maturidade do Produto
-> Autenticacao, governanca, testes, producao.
+### FASE 3.2 — Features de Valor (parcialmente concluida)
+> Funcionalidades de alto impacto baseadas em feedback do time.
 
-- [ ] Autenticacao (NextAuth + Credentials)
+- [x] Stakeholders CRUD ja existe na aba Pre-Projeto (nome, papel, email, interesse, influencia)
+- [ ] Stakeholder matrix visual (grid Interesse x Influencia) — complemento visual
+- [x] Textarea de transcricao de reuniao → IA extrai status reports, stakeholders, itens EAP (MeetingTranscriptModal.tsx + endpoint meeting_transcript)
+- [ ] Consolidacao do modulo de export/impressao (padrao unificado para todos os PDFs)
+- [ ] Dashboard export PDF (relatorio de portfolio)
+- [x] Notificacoes in-app (NotificationBell.tsx com polling 60s, mark-as-read, mark-all-read; montado no Topbar; API GET/PATCH completa)
+- [x] UI de historico/rollback de versoes (ProjectVersionHistory.tsx com timeline, expand/collapse, rollback com confirmacao)
+- [x] Cron/alertas funcionais (3 alertas: projetos parados 7d, riscos materializados, budget warning — com deduplicacao 24h)
+
+### FASE 3.2A — Meeting-to-Everything Pipeline (em andamento)
+> **Estrategia AI-First PMO:** O GP cola a transcricao da reuniao e em 30s toda a documentacao esta atualizada.
+
+- [ ] Promover visibilidade da feature (botao proeminente, nao escondido no header)
+- [ ] Expandir extracao IA: decisoes, atualizacoes de status, mudancas de EAP
+- [ ] UX de revisao aprimorada (aceitar/rejeitar cada item, preview, aplicar selecionados)
+- [ ] Modelo Decision (novo: id, projectId, description, madeBy, madeAt, context, status)
+- [ ] API route decisions CRUD
+
+### FASE 3.2B — Assistente IA do Portfolio
+> Chat no dashboard que responde perguntas sobre o portfolio inteiro via Gemini.
+
+- [ ] Backend: endpoint `/api/ai/chat` (busca dados do banco, monta contexto, Gemini responde)
+- [ ] Frontend: PortfolioAssistant.tsx (barra de prompt, chips de sugestoes, respostas ricas)
+- [ ] Integrar no dashboard (colapsavel, abaixo dos KPIs)
+
+### FASE 3.2C — Smart Digest + Dashboard Executivo
+> Resumo semanal automatico + KPIs enriquecidos + export de portfolio.
+
+- [ ] Smart Digest semanal via IA (expand cron, type WEEKLY_DIGEST, WeeklyDigestCard.tsx)
+- [ ] Dashboard KPIs enriquecidos (por departamento, burn rate, health score, tendencias)
+- [ ] Dashboard export PDF (relatorio de portfolio completo)
+
+### FASE 3.2D — PDF Exports Profissionais
+> Padronizacao visual de todos os PDFs com header/footer consistente.
+
+- [ ] Helper reutilizavel `src/lib/pdf-utils.ts` (header, footer, estilos)
+- [ ] Aplicar em todos os exports existentes e novos
+
+### FASE 4 — Formalizacao / Maturidade do Produto (debito tecnico)
+> Autenticacao, governanca, testes, producao. Pos-aprovacao do Head.
+
+- [ ] Autenticacao (NextAuth + Credentials + modelo User)
+- [ ] RBAC basico (admin, GP, viewer)
 - [ ] Assinatura simbolica de Charter e Encerramento
 - [ ] Fluxo de encerramento completo com checklist e aceite
-- [ ] Testes automatizados (Vitest + Testing Library)
+- [ ] Testes automatizados (Vitest + Testing Library — cobertura de rotas e componentes)
 - [ ] CI/CD (GitHub Actions + Deploy Vercel finalizado)
+
+### FASE 5 — Evolucao do Produto (Backlog)
+> Features de longo prazo baseadas em feedback.
+
+- [ ] Templates de documentos por tipo de projeto (upload, classificacao Desejavel/Obrigatorio, integracao IA)
+- [ ] Suporte multi-moeda (R$ ↔ U$) com conversao
+- [ ] Integracao com ferramentas externas (Jira, Teams, etc.)
 
 ---
 
@@ -470,3 +559,19 @@ O risco e classificado pelo score = Probabilidade (1-5) x Impacto (1-5):
 | Sem autenticacao | Critico (para producao) | NextAuth.js na Fase 4 |
 | EAP hierarquica implementada | Resolvido | buildTree + depth + parent selection |
 | Status override implementado | Resolvido | Popover no header + campos no banco + audit log |
+| Screenshots feedback em producao | Resolvido | Ja usa base64 data URI direto no banco (sem writeFile) |
+| POST /api/tickets 500 | Resolvido | Verificado 21/03 — codigo limpo, sem bug |
+
+---
+
+## 15. BACKLOG DE FEEDBACKS
+
+> Feedbacks recebidos via modulo de feedback do app. Triagem realizada em 21/03/2026.
+
+| Data | Autor | Tipo | Descricao | Prioridade | Fase | Status |
+|------|-------|------|-----------|-----------|------|--------|
+| 20/03 15:13 | Eduardo | Novo Recurso | Suporte multi-moeda (R$ ↔ U$) com conversao | Baixa | 5 | Backlog |
+| 20/03 15:19 | Eduardo | Novo Recurso | Area de carga de templates de documentos por tipo de projeto (Desejavel/Obrigatorio), para IA usar no preenchimento e para impressao/export | Alta | 5 | Backlog |
+| 20/03 15:21 | Eduardo | Novo Recurso | Modulo de impressao/exportacao de documentos com base nos templates por tipo de projeto | Media | 3.2 | Priorizado |
+| 20/03 18:23 | Frank | Melhoria/Bug | POST /api/tickets retorna 500 ao criar ticket | Critica | 3.1 | Resolvido (verificado 21/03) |
+| 20/03 18:32 | Frank | Novo Recurso | Textarea para transcricao de reuniao → IA extrai status report, stakeholders, itens EAP | Alta | 3.2 | Implementado (MeetingTranscriptModal.tsx) |

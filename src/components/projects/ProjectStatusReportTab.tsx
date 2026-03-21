@@ -21,8 +21,7 @@ import {
 import { TabHeader } from "./TabHeader";
 import { StatusLegend } from "@/components/ui/status-legend";
 import { toast } from "sonner";
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { createPdfDoc, addTable, addNarrativeSection, savePdf } from "@/lib/pdf-utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -229,16 +228,10 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
     }
 
     try {
-      const doc = new jsPDF();
-      
-      // Title
-      doc.setFontSize(18);
-      doc.text("Histórico de Relatórios de Status", 14, 22);
-      
-      doc.setFontSize(11);
-      doc.setTextColor(100);
-      doc.text(`Projeto ID: ${projectId}`, 14, 30);
-      doc.text(`Data de Exportação: ${new Date().toLocaleDateString('pt-BR')}`, 14, 35);
+      const { doc, startY } = createPdfDoc({
+        title: "Histórico de Relatórios de Status",
+        projectId,
+      });
 
       const tableData = reports.map(report => [
         report.period,
@@ -248,41 +241,28 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
         report.reportDate ? parseLocalDate(report.reportDate).toLocaleDateString('pt-BR') : "—"
       ]);
 
-      autoTable(doc, {
-        startY: 45,
-        head: [["Período", "Status Geral", "Progresso", "Gasto", "Data"]],
-        body: tableData,
-        headStyles: { fillColor: [201, 163, 85], textColor: [255, 255, 255] }, // Compass Gold
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        margin: { top: 45 },
-      });
+      let detailY = addTable(doc, startY, [["Período", "Status Geral", "Progresso", "Gasto", "Data"]], tableData);
+      detailY += 5;
 
-      // Add a second page for detailed content if needed, or just append it below? 
-      // For now, let's just do a summary table as it's the most common request for "Export All".
-      // If we wanted to export EVERYTHING including descriptions, we'd need a more complex layout.
-      
-      const filename = `Status_Reports_Projeto_${projectId}.pdf`;
-      const pdfData = doc.output('arraybuffer');
-      const blob = new Blob([pdfData], { type: 'application/pdf' });
+      for (const report of reports) {
+        const hasNarrative = report.accomplishments || report.nextSteps || report.issues;
+        if (!hasNarrative) continue;
 
-      if ('showSaveFilePicker' in window) {
-        const handle = await (window as unknown as { showSaveFilePicker: (opts: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker({
-          suggestedName: filename,
-          types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }],
-        });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-      } else {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        detailY = addNarrativeSection(doc, detailY, `${report.period} — ${report.overallStatus}`, "");
+        detailY -= 5;
+
+        if (report.accomplishments) {
+          detailY = addNarrativeSection(doc, detailY, "Realizações", report.accomplishments);
+        }
+        if (report.nextSteps) {
+          detailY = addNarrativeSection(doc, detailY, "Próximos Passos", report.nextSteps);
+        }
+        if (report.issues) {
+          detailY = addNarrativeSection(doc, detailY, "Problemas / Impedimentos", report.issues);
+        }
       }
+
+      await savePdf(doc, `Status_Reports_Projeto_${projectId}.pdf`);
       toast.success("PDF gerado com sucesso!");
     } catch (error) {
       console.error("PDF generation failed:", error);

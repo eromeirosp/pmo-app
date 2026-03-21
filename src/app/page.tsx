@@ -20,6 +20,8 @@ import { StatusDonutChart } from "@/components/dashboard/StatusDonutChart";
 import { BudgetBarChart } from "@/components/dashboard/BudgetBarChart";
 import { ProjectsAreaChart } from "@/components/dashboard/ProjectsAreaChart";
 import { StatusLegend } from "@/components/ui/status-legend";
+import { PortfolioAssistant } from "@/components/dashboard/PortfolioAssistant";
+import { WeeklyDigestCard } from "@/components/dashboard/WeeklyDigestCard";
 
 interface StatsData {
   total: number;
@@ -171,10 +173,13 @@ export default function Home() {
       <Topbar />
 
       <main className="flex-1 container mx-auto px-4 md:px-6 py-8 lg:max-w-7xl">
+        {/* Weekly Digest */}
+        <WeeklyDigestCard />
+
         {/* KPI Row */}
         {statsLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-            {[...Array(6)].map((_, i) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+            {[...Array(5)].map((_, i) => (
               <Skeleton key={i} className="h-[120px] rounded-2xl bg-muted/20" />
             ))}
           </div>
@@ -196,6 +201,9 @@ export default function Home() {
             <StatusLegend compact />
           </div>
         )}
+
+        {/* Portfolio AI Assistant */}
+        <PortfolioAssistant />
 
         {/* Charts Grid */}
         {statsLoading ? (

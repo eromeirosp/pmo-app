@@ -12,24 +12,28 @@ export async function GET() {
         budget: true,
         expectedReturn: true,
         manager: true,
+        department: true,
         createdAt: true,
       },
     });
 
-    // Status distribution
-    const statusCounts = {
-      GREEN: projects.filter((p) => p.status === "GREEN").length,
-      YELLOW: projects.filter((p) => p.status === "YELLOW").length,
-      RED: projects.filter((p) => p.status === "RED").length,
-    };
+    // Status & classification distribution (single pass)
+    const statusCounts: Record<string, number> = { GREEN: 0, YELLOW: 0, RED: 0 };
+    const classificationCounts: Record<string, number> = { TRADITIONAL: 0, AGILE: 0, HYBRID: 0 };
+    const departmentCounts: Record<string, number> = {};
+    for (const p of projects) {
+      if (p.status in statusCounts) statusCounts[p.status]++;
+      if (p.classification && p.classification in classificationCounts) classificationCounts[p.classification]++;
+      const dept = p.department || "Sem Departamento";
+      departmentCounts[dept] = (departmentCounts[dept] || 0) + 1;
+    }
 
-    // Classification distribution
-    const classificationCounts = {
-      TRADITIONAL: projects.filter((p) => p.classification === "TRADITIONAL")
-        .length,
-      AGILE: projects.filter((p) => p.classification === "AGILE").length,
-      HYBRID: projects.filter((p) => p.classification === "HYBRID").length,
-    };
+    // Health score: weighted average (GREEN=100, YELLOW=50, RED=0)
+    const healthScore = projects.length > 0
+      ? Math.round(
+          (statusCounts.GREEN * 100 + statusCounts.YELLOW * 50 + statusCounts.RED * 0) / projects.length
+        )
+      : 0;
 
     // Budget metrics
     const totalBudget = projects.reduce((sum, p) => sum + (p.budget ?? 0), 0);
@@ -62,13 +66,12 @@ export async function GET() {
       });
     }
 
-    projects.forEach((p) => {
+    const monthMap = new Map(months.map((m) => [`${m.year}-${m.month}`, m]));
+    for (const p of projects) {
       const d = new Date(p.createdAt);
-      const m = months.find(
-        (mo) => mo.year === d.getFullYear() && mo.month === d.getMonth()
-      );
+      const m = monthMap.get(`${d.getFullYear()}-${d.getMonth()}`);
       if (m) m.count++;
-    });
+    }
 
     const projectsPerMonth = months.map(({ label, count }) => ({
       month: label,
@@ -102,6 +105,8 @@ export async function GET() {
       total: projects.length,
       statusCounts,
       classificationCounts,
+      departmentCounts,
+      healthScore,
       totalBudget,
       avgBudget,
       topByBudget,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { recordAuditLog } from "@/lib/audit";
+import { recordAuditLogBatch } from "@/lib/audit";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -32,10 +32,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const signals: string[] = [];
 
         // 1. EAP signals
-        const eapItems = (project as any).eapItems || [];
+        const eapItems = project.eapItems || [];
         if (eapItems.length > 0) {
-            const doneCount = eapItems.filter((i: any) => i.status === "DONE").length;
-            const inProgressCount = eapItems.filter((i: any) => i.status === "IN_PROGRESS").length;
+            const doneCount = eapItems.filter((i) => i.status === "DONE").length;
+            const inProgressCount = eapItems.filter((i) => i.status === "IN_PROGRESS").length;
             if (inProgressCount > 0 && doneCount === 0 && eapItems.length > 3) {
                 signals.push("YELLOW"); // lots of WIP, no deliveries
             }
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
 
         // 3. Latest status report signal
-        const lastReport = (project as any).statusReports?.[0];
+        const lastReport = project.statusReports?.[0];
         if (lastReport?.overallStatus) {
             const statusMap: Record<string, string> = { "Verde": "GREEN", "Amarelo": "YELLOW", "Vermelho": "RED" };
             const mapped = statusMap[lastReport.overallStatus];
@@ -70,10 +70,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         else if (signals.includes("YELLOW")) computedStatus = "YELLOW";
 
         // Effective status: override takes priority over computed
-        const effectiveStatus = (project as any).statusOverride || computedStatus;
+        const effectiveStatus = project.statusOverride || computedStatus;
 
         // Strip helper relations from response, add computedStatus + effectiveStatus
-        const { eapItems: _, statusReports: __, ...projectData } = project as any;
+        const { eapItems: _eap, statusReports: _reports, ...projectData } = project;
 
         return NextResponse.json({ ...projectData, computedStatus, effectiveStatus }, { status: 200 });
 
@@ -131,23 +131,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             data: updateData
         });
 
-        // Audit log for changed fields
+        // Audit log for changed fields (batch)
+        const auditEntries: Parameters<typeof recordAuditLogBatch>[0] = [];
         const auditFields = ["name", "status", "classification", "manager", "department", "charterApproved", "statusOverride", "statusOverrideReason"] as const;
         for (const field of auditFields) {
             const oldVal = String(currentProject[field] ?? "");
             const newVal = String(updatedProject[field] ?? "");
             if (oldVal !== newVal) {
-                await recordAuditLog({ projectId: id, action: "UPDATE", entity: "Project", entityId: id, field, oldValue: oldVal, newValue: newVal });
+                auditEntries.push({ projectId: id, action: "UPDATE", entity: "Project", entityId: id, field, oldValue: oldVal, newValue: newVal });
             }
         }
-        // Budget (compare as numbers)
         if (currentProject.budget !== updatedProject.budget) {
-            await recordAuditLog({ projectId: id, action: "UPDATE", entity: "Project", entityId: id, field: "budget", oldValue: String(currentProject.budget), newValue: String(updatedProject.budget) });
+            auditEntries.push({ projectId: id, action: "UPDATE", entity: "Project", entityId: id, field: "budget", oldValue: String(currentProject.budget), newValue: String(updatedProject.budget) });
         }
-        // Expected Return (compare as numbers)
         if (currentProject.expectedReturn !== updatedProject.expectedReturn) {
-            await recordAuditLog({ projectId: id, action: "UPDATE", entity: "Project", entityId: id, field: "expectedReturn", oldValue: String(currentProject.expectedReturn ?? ""), newValue: String(updatedProject.expectedReturn ?? "") });
+            auditEntries.push({ projectId: id, action: "UPDATE", entity: "Project", entityId: id, field: "expectedReturn", oldValue: String(currentProject.expectedReturn ?? ""), newValue: String(updatedProject.expectedReturn ?? "") });
         }
+        await recordAuditLogBatch(auditEntries);
 
         return NextResponse.json(updatedProject, { status: 200 });
 

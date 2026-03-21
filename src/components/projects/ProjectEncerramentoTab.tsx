@@ -5,8 +5,7 @@ import { CheckSquare, BookOpen, Lightbulb, Loader2, Plus, Trash2, Circle, Downlo
 import { TabHeader } from "./TabHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { createPdfDoc, addSection, savePdf } from "@/lib/pdf-utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -287,81 +286,32 @@ export function ProjectEncerramentoTab({ projectId }: ProjectEncerramentoTabProp
     }
 
     try {
-      const doc = new jsPDF();
+      const { doc, startY: initialY } = createPdfDoc({
+        title: "Termo de Encerramento do Projeto",
+        projectId,
+      });
 
-      doc.setFontSize(18);
-      doc.text("Termo de Encerramento do Projeto", 14, 22);
-
-      doc.setFontSize(11);
-      doc.setTextColor(100);
-      doc.text(`Projeto ID: ${projectId}`, 14, 30);
-      doc.text(`Data de Exportação: ${new Date().toLocaleDateString('pt-BR')}`, 14, 35);
-
-      let startY = 48;
+      let startY = initialY;
 
       if (deliverables.length > 0) {
-        doc.setFontSize(13);
-        doc.setTextColor(0);
-        doc.text("Entregáveis Finais", 14, startY);
-        autoTable(doc, {
-          startY: startY + 4,
-          head: [["#", "Entregável"]],
-          body: deliverables.map((item, i) => [String(i + 1), item.text]),
-          headStyles: { fillColor: [201, 163, 85], textColor: [255, 255, 255] },
-          alternateRowStyles: { fillColor: [248, 250, 252] },
-        });
-        startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+        startY = addSection(doc, startY, "Entregáveis Finais",
+          deliverables.map((item, i) => [String(i + 1), item.text])
+        );
       }
 
       if (lessons.length > 0) {
-        doc.setFontSize(13);
-        doc.setTextColor(0);
-        doc.text("Lições Aprendidas", 14, startY);
-        autoTable(doc, {
-          startY: startY + 4,
-          head: [["#", "Lição"]],
-          body: lessons.map((item, i) => [String(i + 1), item.text]),
-          headStyles: { fillColor: [201, 163, 85], textColor: [255, 255, 255] },
-          alternateRowStyles: { fillColor: [248, 250, 252] },
-        });
-        startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+        startY = addSection(doc, startY, "Lições Aprendidas",
+          lessons.map((item, i) => [String(i + 1), item.text])
+        );
       }
 
       if (recommendations.length > 0) {
-        doc.setFontSize(13);
-        doc.setTextColor(0);
-        doc.text("Recomendações para Projetos Futuros", 14, startY);
-        autoTable(doc, {
-          startY: startY + 4,
-          head: [["#", "Recomendação"]],
-          body: recommendations.map((item, i) => [String(i + 1), item.text]),
-          headStyles: { fillColor: [201, 163, 85], textColor: [255, 255, 255] },
-          alternateRowStyles: { fillColor: [248, 250, 252] },
-        });
+        addSection(doc, startY, "Recomendações para Projetos Futuros",
+          recommendations.map((item, i) => [String(i + 1), item.text])
+        );
       }
 
-      const filename = `Encerramento_Projeto_${projectId}.pdf`;
-      const pdfData = doc.output('arraybuffer');
-      const blob = new Blob([pdfData], { type: 'application/pdf' });
-
-      if ('showSaveFilePicker' in window) {
-        const handle = await (window as unknown as { showSaveFilePicker: (opts: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker({
-          suggestedName: filename,
-          types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }],
-        });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-      } else {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 10000);
-      }
+      await savePdf(doc, `Encerramento_Projeto_${projectId}.pdf`);
       toast.success("PDF gerado com sucesso!");
     } catch (error) {
       console.error("PDF generation failed:", error);

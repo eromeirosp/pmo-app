@@ -5,8 +5,9 @@ import { Project, Risk } from "@prisma/client";
 import { parseLocalDate } from "@/lib/utils";
 import {
   FileText, Lightbulb, CheckCircle2, Trash2, Plus,
-  Package, Pin, Ban, AlertTriangle, Loader2, Sparkles, X, ShieldCheck, CircleSlash
+  Package, Pin, Ban, AlertTriangle, Loader2, Sparkles, X, ShieldCheck, CircleSlash, Download
 } from "lucide-react";
+import { createPdfDoc, addSection, savePdf } from "@/lib/pdf-utils";
 import { TabHeader } from "./TabHeader";
 import { toast } from "sonner";
 
@@ -185,7 +186,7 @@ function ListSection({ title, icon, items, loading, addLabel, onAdd, onRemove, p
 export function ProjectCharterTab({ project, saveTrigger, onApprovalChange }: ProjectCharterTabProps) {
   const [items, setItems] = useState<CharterRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [charterApproved, setCharterApproved] = useState<boolean>((project as any).charterApproved ?? false);
+  const [charterApproved, setCharterApproved] = useState<boolean>(project.charterApproved ?? false);
   const [approvingCharter, setApprovingCharter] = useState(false);
   const baseUrl = `/api/projects/${project.id}/charter`;
 
@@ -203,6 +204,35 @@ export function ProjectCharterTab({ project, saveTrigger, onApprovalChange }: Pr
   }, [baseUrl]);
 
   const itemsOf = (type: string) => items.filter((i) => i.type === type);
+
+  const handleExport = async () => {
+    try {
+      const { doc, startY: initialY } = createPdfDoc({
+        title: "Termo de Abertura (Project Charter)",
+        projectName: project.name,
+        projectId: project.id,
+        meta: [`Status: ${charterApproved ? "Aprovado" : "Pendente"}`],
+      });
+
+      const sections = [
+        { type: TYPES.CRITERIA, title: "Critérios de Sucesso" },
+        { type: TYPES.DELIVERABLE, title: "Entregáveis" },
+        { type: TYPES.PREMISE, title: "Premissas" },
+        { type: TYPES.RESTRICTION, title: "Restrições" },
+      ];
+
+      let startY = initialY;
+      for (const section of sections) {
+        const sectionItems = itemsOf(section.type);
+        startY = addSection(doc, startY, section.title, sectionItems.map((i) => [i.text]));
+      }
+
+      await savePdf(doc, `Charter_Projeto_${project.id}.pdf`);
+      toast.success("PDF gerado com sucesso!");
+    } catch {
+      toast.error("Erro ao gerar PDF.");
+    }
+  };
 
   const handleAdd = useCallback(async (type: string, text: string, source: 'manual' | 'ai' = 'manual') => {
     const res = await fetch(baseUrl, {
@@ -264,7 +294,15 @@ export function ProjectCharterTab({ project, saveTrigger, onApprovalChange }: Pr
           icon={FileText}
           title="Termo de Abertura (Project Charter)"
           description="Documento formal que autoriza o projeto e define escopo inicial."
-          actions={null}
+          actions={
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-2 rounded-xl h-10 px-4 bg-card border border-border text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+            >
+              <Download className="w-4 h-4" />
+              Exportar PDF
+            </button>
+          }
         />
 
       </div>
