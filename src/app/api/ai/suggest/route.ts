@@ -252,11 +252,13 @@ Retorne apenas o JSON, sem marcações markdown ou texto antes/depois.`;
       response = await ai.models.generateContent({
         model: "gemini-2.5-pro",
         contents: prompt,
+        config: { maxOutputTokens: 8192 },
       });
     } catch {
       response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
+        config: { maxOutputTokens: 8192 },
       });
     }
 
@@ -282,15 +284,35 @@ Retorne apenas o JSON, sem marcações markdown ou texto antes/depois.`;
 
     rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
 
+    // Extract JSON object from potential preamble/postamble text
+    const firstBrace = rawText.indexOf("{");
+    const lastBrace = rawText.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      rawText = rawText.slice(firstBrace, lastBrace + 1);
+    }
+
     let result;
     try {
       result = JSON.parse(rawText);
     } catch {
-      console.error("Failed to parse AI suggest response:", rawText);
-      return NextResponse.json(
-        { error: "Erro ao formatar resposta da IA." },
-        { status: 500 }
-      );
+      // Attempt to recover truncated JSON by closing open brackets
+      let recovered = rawText;
+      // Remove trailing incomplete string/value (e.g., `"text": "some trunc`)
+      recovered = recovered.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"]*$/, "");
+      // Count unclosed brackets and close them
+      const openBraces = (recovered.match(/{/g) || []).length - (recovered.match(/}/g) || []).length;
+      const openBrackets = (recovered.match(/\[/g) || []).length - (recovered.match(/]/g) || []).length;
+      recovered += "]".repeat(Math.max(0, openBrackets)) + "}".repeat(Math.max(0, openBraces));
+      try {
+        result = JSON.parse(recovered);
+        console.warn("Recovered truncated AI JSON response");
+      } catch {
+        console.error("Failed to parse AI suggest response:", rawText.slice(0, 500));
+        return NextResponse.json(
+          { error: "Erro ao formatar resposta da IA. Tente com um texto menor." },
+          { status: 500 }
+        );
+      }
     }
 
     // Validar resposta com schema Zod
@@ -298,9 +320,13 @@ Retorne apenas o JSON, sem marcações markdown ou texto antes/depois.`;
     if (schema) {
       const parsed = schema.safeParse(result);
       if (!parsed.success) {
-        console.error("AI response validation failed:", JSON.stringify(parsed.error.flatten()));
+        const flatErrors = parsed.error.flatten();
+        console.error("AI response validation failed for type:", type);
+        console.error("Zod errors:", JSON.stringify(flatErrors));
+        console.error("Raw AI response (first 1000 chars):", rawText.slice(0, 1000));
+        console.error("Parsed result keys:", Object.keys(result));
         return NextResponse.json(
-          { error: "Resposta da IA em formato inesperado." },
+          { error: "Resposta da IA em formato inesperado. Tente novamente ou use um texto mais curto." },
           { status: 502 }
         );
       }

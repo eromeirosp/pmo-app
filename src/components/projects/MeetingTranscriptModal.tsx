@@ -89,7 +89,10 @@ export function MeetingTranscriptModal({
         }),
       });
 
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || "Erro ao analisar transcrição.");
+      }
       const data = await res.json();
       setResult(data);
 
@@ -104,8 +107,9 @@ export function MeetingTranscriptModal({
       setSelectedItems(defaults);
 
       toast.success("Transcrição analisada com sucesso!");
-    } catch {
-      toast.error("Erro ao analisar transcrição.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao analisar transcrição.";
+      toast.error(message);
     } finally {
       setLoading(false);
     }

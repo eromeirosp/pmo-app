@@ -49,3 +49,5 @@ prisma/seed-self.ts
 
 # Agents and local skills (generated)
 .agents/
+.claude/
+.superpowers/
