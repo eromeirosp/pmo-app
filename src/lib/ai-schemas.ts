@@ -103,6 +103,54 @@ export const ClosingSuggestionsSchema = z.object({
   recommendations: z.array(z.string()).min(1),
 });
 
+// --- Meeting Transcript Parse ---
+
+export const MeetingTranscriptSchema = z.object({
+  statusReport: z.object({
+    accomplishments: z.string().optional().default(""),
+    nextSteps: z.string().optional().default(""),
+    issues: z.string().optional().default(""),
+    overallStatus: z.string().optional(),
+    statusJustification: z.string().optional(),
+  }).optional(),
+  stakeholders: z.array(
+    z.object({
+      name: z.string().min(1),
+      role: z.string().optional().default(""),
+    })
+  ).optional().default([]),
+  eapItems: z.array(
+    z.object({
+      name: z.string().min(1),
+      description: z.string().optional().default(""),
+    })
+  ).optional().default([]),
+  eapUpdates: z.array(
+    z.object({
+      name: z.string().min(1),
+      newStatus: z.enum(["PENDING", "IN_PROGRESS", "DONE"]),
+      reason: z.string().optional().default(""),
+    })
+  ).optional().default([]),
+  risks: z.array(
+    z.object({
+      title: z.string().min(1),
+      description: z.string().optional().default(""),
+      probability: z.number().min(1).max(5).optional().default(3),
+      impact: z.number().min(1).max(5).optional().default(3),
+      category: z.string().optional().default("Gerenciamento de Projeto"),
+    })
+  ).optional().default([]),
+  decisions: z.array(
+    z.object({
+      description: z.string().min(1),
+      madeBy: z.string().optional().default(""),
+      context: z.string().optional().default(""),
+    })
+  ).optional().default([]),
+  summary: z.string().min(1),
+});
+
 // --- Mapa de schemas por tipo de sugestão ---
 
 export const SUGGEST_SCHEMAS: Record<string, z.ZodType> = {
@@ -116,4 +164,5 @@ export const SUGGEST_SCHEMAS: Record<string, z.ZodType> = {
   eap_suggest: EapSuggestionsSchema,
   closing_suggest: ClosingSuggestionsSchema,
   cadence_suggest: CadenceSchema,
+  meeting_transcript: MeetingTranscriptSchema,
 };

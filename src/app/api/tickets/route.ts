@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { writeFile } from "fs/promises";
-import path from "path";
-import { randomUUID } from "crypto";
 
 export async function GET(req: NextRequest) {
   try {
@@ -42,18 +39,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Store screenshot as base64 data URI directly in the database
+    // This works on Vercel (serverless has read-only filesystem)
     let screenshotUrl: string | null = null;
-
-    if (screenshotBase64) {
-      const matches = screenshotBase64.match(/^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/);
-      if (matches) {
-        const ext = matches[1] === "jpeg" ? "jpg" : matches[1];
-        const buffer = Buffer.from(matches[2], "base64");
-        const fileName = `${Date.now()}_${randomUUID().slice(0, 8)}.${ext}`;
-        const filePath = path.join(process.cwd(), "public", "uploads", "tickets", fileName);
-        await writeFile(filePath, buffer);
-        screenshotUrl = `/uploads/tickets/${fileName}`;
-      }
+    if (screenshotBase64 && /^data:image\/(png|jpeg|jpg|webp);base64,.+$/.test(screenshotBase64)) {
+      screenshotUrl = screenshotBase64;
     }
 
     const ticket = await prisma.ticket.create({

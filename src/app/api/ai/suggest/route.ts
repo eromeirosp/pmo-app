@@ -16,7 +16,8 @@ type SuggestType =
   | "classification"
   | "eap_suggest"
   | "closing_suggest"
-  | "cadence_suggest";
+  | "cadence_suggest"
+  | "meeting_transcript";
 
 const PROMPTS: Record<SuggestType, string> = {
   charter_criteria: `Com base no contexto do projeto abaixo, sugira de 3 a 5 critérios de sucesso MENSURÁVEIS e específicos.
@@ -86,6 +87,26 @@ Gere:
 2. "deliverables": Array de entregas com "text" (nome da entrega) e "status" ("concluído", "parcial" ou "não entregue"), baseado nos dados reais
 3. "lessons": Array de 3-5 lições aprendidas baseadas no histórico real do projeto
 4. "recommendations": Array de 3-5 recomendações para projetos futuros baseadas na experiência deste projeto`,
+
+  meeting_transcript: `Você é um PMO Master especialista. Analise a transcrição de reunião abaixo no contexto do projeto e extraia TODAS as informações estruturadas possíveis.
+
+A transcrição será fornecida no campo "transcript" do input do usuário.
+
+Extraia TODAS as informações relevantes que encontrar:
+1. "summary": Resumo executivo da reunião em 2-3 frases.
+2. "statusReport": Se houver informações sobre progresso, conquistas, próximos passos ou problemas:
+   - "accomplishments": o que foi realizado
+   - "nextSteps": próximas ações definidas
+   - "issues": problemas ou impedimentos mencionados
+   - "overallStatus": se a reunião indica mudança de status do projeto, sugira "Verde (Saudável)", "Amarelo (Atenção)" ou "Vermelho (Risco)"
+   - "statusJustification": justificativa para a mudança de status sugerida
+3. "stakeholders": Nomes de pessoas mencionadas com papéis [{ "name", "role" }].
+4. "eapItems": NOVAS tarefas, atividades ou entregas identificadas [{ "name", "description" }].
+5. "eapUpdates": Tarefas EXISTENTES que mudaram de status na reunião [{ "name" (nome exato ou aproximado do item EAP), "newStatus" ("PENDING" | "IN_PROGRESS" | "DONE"), "reason" (por que mudou) }]. Compare com os itens da EAP do contexto do projeto.
+6. "risks": Riscos, problemas potenciais ou preocupações [{ "title", "description", "probability" (1-5), "impact" (1-5), "category" }].
+7. "decisions": Decisões tomadas na reunião [{ "description" (o que foi decidido), "madeBy" (quem decidiu, se mencionado), "context" (contexto/justificativa da decisão) }].
+
+Seja inteligente: extraia apenas o que faz sentido. Se a transcrição não menciona riscos, retorne array vazio para risks. Idem para outros campos. Mas seja AGRESSIVO em identificar decisões — qualquer "ficou decidido que", "vamos fazer X", "combinamos que" é uma decisão.`,
 };
 
 async function getProjectContext(projectId: string, enriched = false) {
@@ -158,7 +179,7 @@ Itens do Charter: ${project.charterItems.map((c) => `[${c.type}] ${sanitizeForPr
 export async function POST(req: NextRequest) {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const { projectId, type } = await req.json();
+    const { projectId, type, transcript } = await req.json();
 
     if (!projectId || !type) {
       return NextResponse.json(
@@ -190,6 +211,7 @@ export async function POST(req: NextRequest) {
     const isEap = type === "eap_suggest";
     const isClosing = type === "closing_suggest";
     const isCadence = type === "cadence_suggest";
+    const isMeetingTranscript = type === "meeting_transcript";
 
     let responseFormat: string;
     if (isListType) {
@@ -197,15 +219,22 @@ export async function POST(req: NextRequest) {
     } else if (isRisk) {
       responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "suggestions": [{ "title": "...", "description": "...", "probability": 3, "impact": 4, "category": "...", "mitigation": "...", "contingency": "..." }] }`;
     } else if (isClassification) {
-      responseFormat = ""; // Already included in the prompt
+      responseFormat = "";
     } else if (isEap) {
       responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "suggestions": [{ "name": "Fase 1 - Nome", "description": "Descrição", "children": [{ "name": "Sub-pacote", "description": "Descrição" }] }] }`;
     } else if (isClosing) {
       responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "summary": "Resumo executivo...", "deliverables": [{ "text": "Entrega X", "status": "concluído|parcial|não entregue" }], "lessons": ["Lição 1", ...], "recommendations": ["Recomendação 1", ...] }`;
     } else if (isCadence) {
-      responseFormat = ""; // Already included in the prompt
+      responseFormat = "";
+    } else if (isMeetingTranscript) {
+      responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "summary": "...", "statusReport": { "accomplishments": "...", "nextSteps": "...", "issues": "...", "overallStatus": "Verde (Saudável)|Amarelo (Atenção)|Vermelho (Risco)", "statusJustification": "..." }, "stakeholders": [{ "name": "...", "role": "..." }], "eapItems": [{ "name": "...", "description": "..." }], "eapUpdates": [{ "name": "...", "newStatus": "PENDING|IN_PROGRESS|DONE", "reason": "..." }], "risks": [{ "title": "...", "description": "...", "probability": 3, "impact": 3, "category": "..." }], "decisions": [{ "description": "...", "madeBy": "...", "context": "..." }] }`;
     } else {
       responseFormat = `Retorne ESTRITAMENTE um JSON válido: { "accomplishments": "...", "nextSteps": "...", "issues": "..." }`;
+    }
+
+    let transcriptSection = "";
+    if (isMeetingTranscript && transcript) {
+      transcriptSection = `\n\nTranscrição da Reunião:\n${sanitizeForPrompt(transcript, 10000)}`;
     }
 
     const prompt = `Você atua como um PMO Master especialista em gestão de projetos corporativos.
@@ -213,7 +242,7 @@ export async function POST(req: NextRequest) {
 ${PROMPTS[type as SuggestType]}
 
 Contexto do Projeto:
-${ctx.contextText}
+${ctx.contextText}${transcriptSection}
 
 ${responseFormat}
 Retorne apenas o JSON, sem marcações markdown ou texto antes/depois.`;

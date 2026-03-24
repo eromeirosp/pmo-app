@@ -1,12 +1,13 @@
 "use client";
 
-import { ChevronLeft, Printer, Save, History, Upload, Trash2, Loader2, ShieldAlert, RotateCcw, Pencil, GitBranch } from "lucide-react";
+import { ChevronLeft, Printer, Save, History, Upload, Trash2, Loader2, ShieldAlert, RotateCcw, Pencil, GitBranch, Mic } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
 import { ProjectAuditModal } from "./ProjectAuditModal";
 import { ProjectVersionHistory } from "./ProjectVersionHistory";
+import { MeetingTranscriptModal } from "./MeetingTranscriptModal";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -43,6 +44,7 @@ const STATUS_OPTIONS = [
 export function ProjectHeader({ project, onSave, onProjectUpdate }: ProjectHeaderProps) {
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+  const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showOverrideForm, setShowOverrideForm] = useState(false);
   const [overrideStatus, setOverrideStatus] = useState(project.statusOverride || "");
@@ -268,6 +270,16 @@ export function ProjectHeader({ project, onSave, onProjectUpdate }: ProjectHeade
               Versões
             </Button>
 
+            <Button
+              variant="outline"
+              className="flex items-center gap-2 font-bold bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 shadow-sm shadow-primary/10"
+              onClick={() => setIsTranscriptOpen(true)}
+            >
+              <Mic className="h-4 w-4" />
+              <span className="hidden sm:inline">Registrar Reunião</span>
+              <span className="sm:hidden">Reunião</span>
+            </Button>
+
             <ProjectAuditModal
               projectId={project.id}
               isOpen={isAuditModalOpen}
@@ -277,6 +289,11 @@ export function ProjectHeader({ project, onSave, onProjectUpdate }: ProjectHeade
               projectId={project.id}
               isOpen={isVersionHistoryOpen}
               onClose={() => setIsVersionHistoryOpen(false)}
+            />
+            <MeetingTranscriptModal
+              projectId={project.id}
+              isOpen={isTranscriptOpen}
+              onClose={() => setIsTranscriptOpen(false)}
             />
             <Button
               variant="outline"

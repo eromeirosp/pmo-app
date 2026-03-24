@@ -97,7 +97,7 @@ export default function ProjectDetailsPage() {
             {activeTab === "pre-projeto" && <ProjectPreProjectTab project={project} saveTrigger={saveTrigger} />}
             {activeTab === "termo-abertura" && <ProjectCharterTab project={project} saveTrigger={saveTrigger} onApprovalChange={() => fetchProject()} />}
             {activeTab === "matriz-risco" && <ProjectRiskTab project={project} />}
-            {activeTab === "eap" && <ProjectEapTab projectId={project.id} charterApproved={(project as any).charterApproved ?? false} />}
+            {activeTab === "eap" && <ProjectEapTab projectId={project.id} charterApproved={project.charterApproved ?? false} />}
             {activeTab === "status-report" && <ProjectStatusReportTab projectId={project.id} />}
             {activeTab === "orcamento" && <ProjectBudgetTab projectId={project.id} totalBudget={project.budget} />}
             {activeTab === "encerramento" && <ProjectEncerramentoTab projectId={project.id} />}
