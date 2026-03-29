@@ -33,7 +33,7 @@ interface MeetingTranscriptResult {
     overallStatus?: string;
     statusJustification?: string;
   };
-  stakeholders?: Array<{ name: string; role: string }>;
+  stakeholders?: Array<{ name: string; role: string; alreadyRegistered?: boolean }>;
   eapItems?: Array<{ name: string; description: string }>;
   eapUpdates?: Array<{ name: string; newStatus: string; reason: string }>;
   risks?: Array<{
@@ -99,7 +99,7 @@ export function MeetingTranscriptModal({
       // Default all items to selected
       const defaults: Record<string, boolean> = {};
       if (data.statusReport) defaults["statusReport"] = true;
-      data.stakeholders?.forEach((_: unknown, i: number) => { defaults[`stakeholder_${i}`] = true; });
+      data.stakeholders?.forEach((s: { alreadyRegistered?: boolean }, i: number) => { defaults[`stakeholder_${i}`] = !s.alreadyRegistered; });
       data.eapItems?.forEach((_: unknown, i: number) => { defaults[`eapItem_${i}`] = true; });
       data.eapUpdates?.forEach((_: unknown, i: number) => { defaults[`eapUpdate_${i}`] = true; });
       data.risks?.forEach((_: unknown, i: number) => { defaults[`risk_${i}`] = true; });
@@ -147,8 +147,8 @@ export function MeetingTranscriptModal({
         applied++;
       }
 
-      // Apply Stakeholders
-      const selectedStakeholders = result.stakeholders?.filter((_, i) => selectedItems[`stakeholder_${i}`]) || [];
+      // Apply Stakeholders (skip already registered)
+      const selectedStakeholders = result.stakeholders?.filter((s, i) => selectedItems[`stakeholder_${i}`] && !s.alreadyRegistered) || [];
       for (const s of selectedStakeholders) {
         await fetch(`/api/projects/${projectId}/stakeholders`, {
           method: "POST",
@@ -421,6 +421,7 @@ export function MeetingTranscriptModal({
                     onToggle={() => toggleItem(`stakeholder_${i}`)}
                     primary={s.name}
                     secondary={s.role}
+                    badge={s.alreadyRegistered ? "Já cadastrado" : undefined}
                   />
                 ))}
               </div>
@@ -538,11 +539,13 @@ function SelectableItem({
   onToggle,
   primary,
   secondary,
+  badge,
 }: {
   selected: boolean;
   onToggle: () => void;
   primary: string;
   secondary?: string;
+  badge?: string;
 }) {
   return (
     <div
@@ -555,7 +558,14 @@ function SelectableItem({
     >
       <ToggleCheck selected={selected} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground">{primary}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-foreground">{primary}</p>
+          {badge && (
+            <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+              {badge}
+            </span>
+          )}
+        </div>
         {secondary && (
           <p className="text-xs text-muted-foreground mt-0.5">{secondary}</p>
         )}

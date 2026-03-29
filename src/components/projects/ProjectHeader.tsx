@@ -1,13 +1,14 @@
 "use client";
 
-import { ChevronLeft, Printer, Save, History, Upload, Trash2, Loader2, ShieldAlert, RotateCcw, Pencil, GitBranch, Mic } from "lucide-react";
+import { ChevronLeft, Printer, Save, History, Upload, Trash2, Loader2, ShieldAlert, ShieldCheck, RotateCcw, Pencil, GitBranch, Mic } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ProjectAuditModal } from "./ProjectAuditModal";
 import { ProjectVersionHistory } from "./ProjectVersionHistory";
 import { MeetingTranscriptModal } from "./MeetingTranscriptModal";
+import { HealthScoreIndicator } from "@/components/intelligence/HealthScoreIndicator";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -30,6 +31,7 @@ interface ProjectHeaderProps {
     effectiveStatus?: string;
     statusOverride?: string | null;
     statusOverrideReason?: string | null;
+    closingApproved?: boolean;
   };
   onSave?: () => void;
   onProjectUpdate?: () => void;
@@ -50,8 +52,29 @@ export function ProjectHeader({ project, onSave, onProjectUpdate }: ProjectHeade
   const [overrideStatus, setOverrideStatus] = useState(project.statusOverride || "");
   const [overrideReason, setOverrideReason] = useState(project.statusOverrideReason || "");
   const [savingOverride, setSavingOverride] = useState(false);
+  const [healthScore, setHealthScore] = useState<number | null>(null);
+  const [healthTrend, setHealthTrend] = useState<"improving" | "stable" | "declining">("stable");
+  const [healthSparkline, setHealthSparkline] = useState<{ date: string; score: number }[]>([]);
   const overrideRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  const fetchHealth = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/projects/${project.id}/health`);
+      if (res.ok) {
+        const data = await res.json();
+        setHealthScore(data.healthScore);
+        setHealthTrend(data.trend || "stable");
+        setHealthSparkline(data.sparkline || []);
+      }
+    } catch {
+      // Health data is optional
+    }
+  }, [project.id]);
+
+  useEffect(() => {
+    fetchHealth();
+  }, [fetchHealth]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -137,7 +160,7 @@ export function ProjectHeader({ project, onSave, onProjectUpdate }: ProjectHeade
         </div>
 
         {/* Hero Content */}
-        <div className="flex flex-wrap justify-between items-start gap-6">
+        <div className="space-y-4">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2 mb-1 relative">
               {/* Status badge - shows effective status */}
@@ -172,6 +195,12 @@ export function ProjectHeader({ project, onSave, onProjectUpdate }: ProjectHeade
               <span className="px-2.5 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-bold border border-border text-muted-foreground bg-secondary">
                 {project.classification?.replace('_', ' ') || 'PROJETO'}
               </span>
+              {project.closingApproved && (
+                <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-bold border bg-blue-500/10 text-blue-600 border-blue-500/20 dark:bg-blue-500/20 dark:text-blue-400">
+                  <ShieldCheck className="h-3 w-3" />
+                  Encerrado
+                </span>
+              )}
 
               {/* Override popover */}
               {showOverrideForm && (
@@ -246,12 +275,21 @@ export function ProjectHeader({ project, onSave, onProjectUpdate }: ProjectHeade
                 </div>
               )}
             </div>
-            <h1 className="text-foreground text-3xl md:text-4xl font-black leading-tight tracking-tight max-w-4xl">
-              {project.name}
-            </h1>
+            <div className="flex items-center gap-4">
+              <h1 className="text-foreground text-3xl md:text-4xl font-black leading-tight tracking-tight max-w-4xl">
+                {project.name}
+              </h1>
+              {healthScore !== null && (
+                <HealthScoreIndicator
+                  score={healthScore}
+                  trend={healthTrend}
+                  sparkline={healthSparkline}
+                />
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Button
               variant="outline"
               className="hidden md:flex items-center gap-2 font-bold bg-secondary text-secondary-foreground border-none hover:bg-secondary/80"
@@ -335,6 +373,8 @@ export function ProjectHeader({ project, onSave, onProjectUpdate }: ProjectHeade
             <Button
               className="items-center gap-2 font-bold px-6 shadow-sm"
               onClick={onSave}
+              disabled={project.closingApproved === true}
+              title={project.closingApproved ? "Projeto encerrado — reabra para editar" : undefined}
             >
               <Save className="h-4 w-4" />
               Salvar

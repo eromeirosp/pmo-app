@@ -4,9 +4,14 @@ import { useState, useEffect, useCallback } from "react";
 import { Project, Prisma } from "@prisma/client";
 import {
   Briefcase, FileText, CheckCircle2, XCircle, Target,
-  Plus, Circle, Trash2, Users, Mail, UserPlus, ClipboardList, Loader2, Pencil
+  Plus, Circle, Trash2, Users, Mail, UserPlus, ClipboardList, Loader2, Pencil, Grid2x2
 } from "lucide-react";
+import {
+  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
+  ResponsiveContainer, Cell, ReferenceArea, Label,
+} from "recharts";
 import { toast } from "sonner";
+import { formatCurrency } from "@/lib/format";
 import { TabHeader } from "./TabHeader";
 import {
   Dialog,
@@ -57,6 +62,7 @@ export function ProjectPreProjectTab({ project, saveTrigger }: ProjectPreProject
   const [editingStakeholder, setEditingStakeholder] = useState<StakeholderRow | null>(null);
   const [editStForm, setEditStForm] = useState({ name: "", role: "", email: "", interest: "Médio", influence: "Média" });
   const [savingStEdit, setSavingStEdit] = useState(false);
+  const [showMatrix, setShowMatrix] = useState(false);
   const [loadingObj, setLoadingObj] = useState(true);
   const [loadingSt, setLoadingSt] = useState(true);
   const [savingObj, setSavingObj] = useState(false);
@@ -258,7 +264,7 @@ export function ProjectPreProjectTab({ project, saveTrigger }: ProjectPreProject
               <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
                 <div className="flex justify-between items-center mb-1">
                   <h3 className="text-sm font-bold text-primary">Budget Estimado</h3>
-                  <span className="text-primary font-black">R$ {project.budget.toLocaleString('pt-BR')}</span>
+                  <span className="text-primary font-black">{formatCurrency(project.budget, project.currency || "BRL")}</span>
                 </div>
                 <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-2">
                   <div className="bg-primary h-2 rounded-full w-full"></div>
@@ -423,6 +429,106 @@ export function ProjectPreProjectTab({ project, saveTrigger }: ProjectPreProject
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Stakeholder Matrix */}
+          {stakeholders.length >= 2 && (
+            <div className="mb-8">
+              <button
+                onClick={() => setShowMatrix((v) => !v)}
+                className="flex items-center gap-2 text-sm font-bold text-primary hover:underline transition-all cursor-pointer mb-4"
+              >
+                <Grid2x2 className="h-4 w-4" />
+                {showMatrix ? "Ocultar Matriz de Stakeholders" : "Ver Matriz de Stakeholders"}
+              </button>
+
+              {showMatrix && (
+                <div className="bg-card dark:bg-slate-900/80 p-6 rounded-2xl border border-border dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:ring-1 dark:ring-white/5">
+                  <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4">Matriz Interesse × Influência</h3>
+                  <ResponsiveContainer width="100%" height={360}>
+                    <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
+                      {/* Quadrant backgrounds */}
+                      <ReferenceArea x1={0.5} x2={2} y1={0.5} y2={2} fill="#94a3b8" fillOpacity={0.06} />
+                      <ReferenceArea x1={2} x2={3.5} y1={0.5} y2={2} fill="#3b82f6" fillOpacity={0.06} />
+                      <ReferenceArea x1={0.5} x2={2} y1={2} y2={3.5} fill="#f59e0b" fillOpacity={0.06} />
+                      <ReferenceArea x1={2} x2={3.5} y1={2} y2={3.5} fill="#ef4444" fillOpacity={0.06} />
+
+                      {/* Quadrant labels */}
+                      <ReferenceArea x1={0.5} x2={2} y1={0.5} y2={2} label={{ value: "Monitorar", position: "center", fill: "#94a3b8", fontSize: 11, fontWeight: 600 }} />
+                      <ReferenceArea x1={2} x2={3.5} y1={0.5} y2={2} label={{ value: "Manter Satisfeito", position: "center", fill: "#3b82f6", fontSize: 11, fontWeight: 600 }} />
+                      <ReferenceArea x1={0.5} x2={2} y1={2} y2={3.5} label={{ value: "Manter Informado", position: "center", fill: "#f59e0b", fontSize: 11, fontWeight: 600 }} />
+                      <ReferenceArea x1={2} x2={3.5} y1={2} y2={3.5} label={{ value: "Gerenciar de Perto", position: "center", fill: "#ef4444", fontSize: 11, fontWeight: 600 }} />
+
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                      <XAxis
+                        type="number"
+                        dataKey="influence"
+                        domain={[0.5, 3.5]}
+                        ticks={[1, 2, 3]}
+                        tickFormatter={(v: number) => v === 1 ? "Baixa" : v === 2 ? "Média" : "Alta"}
+                        tick={{ fontSize: 11 }}
+                      >
+                        <Label value="Influência" position="bottom" offset={0} style={{ fontSize: 12, fontWeight: 700, fill: "var(--foreground)" }} />
+                      </XAxis>
+                      <YAxis
+                        type="number"
+                        dataKey="interest"
+                        domain={[0.5, 3.5]}
+                        ticks={[1, 2, 3]}
+                        tickFormatter={(v: number) => v === 1 ? "Baixo" : v === 2 ? "Médio" : "Alto"}
+                        tick={{ fontSize: 11 }}
+                      >
+                        <Label value="Interesse" angle={-90} position="left" offset={10} style={{ fontSize: 12, fontWeight: 700, fill: "var(--foreground)" }} />
+                      </YAxis>
+                      <RechartsTooltip
+                        content={({ payload }) => {
+                          if (!payload?.length) return null;
+                          const d = payload[0].payload as { name: string; role: string };
+                          return (
+                            <div className="bg-popover text-popover-foreground border border-border rounded-lg px-3 py-2 shadow-lg text-xs">
+                              <p className="font-bold">{d.name}</p>
+                              <p className="text-muted-foreground">{d.role}</p>
+                            </div>
+                          );
+                        }}
+                      />
+                      <Scatter
+                        data={stakeholders.map((s) => {
+                          const interestMap: Record<string, number> = { "Baixo": 1, "Médio": 2, "Alto": 3 };
+                          const influenceMap: Record<string, number> = { "Baixa": 1, "Média": 2, "Alta": 3, "Baixo": 1, "Médio": 2, "Alto": 3 };
+                          return {
+                            name: s.name,
+                            role: s.role,
+                            interest: interestMap[s.interest] || 2,
+                            influence: influenceMap[s.influence] || 2,
+                          };
+                        })}
+                        fill="var(--primary)"
+                      >
+                        {stakeholders.map((s, i) => (
+                          <Cell key={s.id} fill={(() => {
+                            const intMap: Record<string, number> = { "Baixo": 1, "Médio": 2, "Alto": 3 };
+                            const infMap: Record<string, number> = { "Baixa": 1, "Média": 2, "Alta": 3, "Baixo": 1, "Médio": 2, "Alto": 3 };
+                            const intVal = intMap[s.interest] || 2;
+                            const infVal = infMap[s.influence] || 2;
+                            if (intVal >= 2.5 && infVal >= 2.5) return "#ef4444";
+                            if (intVal >= 2.5) return "#f59e0b";
+                            if (infVal >= 2.5) return "#3b82f6";
+                            return "#94a3b8";
+                          })()} />
+                        ))}
+                      </Scatter>
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                  <div className="flex flex-wrap gap-4 mt-3 justify-center text-[10px] font-bold uppercase tracking-wider">
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500" />Gerenciar de Perto</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" />Manter Informado</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" />Manter Satisfeito</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-400" />Monitorar</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

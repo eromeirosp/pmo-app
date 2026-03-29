@@ -713,27 +713,14 @@ export default function ProjectEapTab({ projectId, charterApproved = false }: { 
               onChange={(e) => setForm({ ...form, parentId: e.target.value })}
             >
               <option value="">-- Raiz (Nenhum pacote pai) --</option>
-              {treeItems.map((item) => (
+              {treeItems.filter((item) => item.depth === 0).map((item) => (
                 <option key={item.id} value={item.id}>
-                  {`${'—'.repeat(item.depth)} ${item.name}`}
+                  {item.name}
                 </option>
               ))}
             </select>
           </div>
 
-          <div className="md:col-span-12">
-            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Pacote Pai (Opcional)</label>
-            <select
-              className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-50 px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-              value={form.parentId}
-              onChange={(e) => setForm({ ...form, parentId: e.target.value })}
-            >
-              <option value="">-- Raiz (Nenhum pacote pai) --</option>
-              {items.map((item) => (
-                <option key={item.id} value={item.id}>{item.name}</option>
-              ))}
-            </select>
-          </div>
           <div className="md:col-span-12">
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Descrição</label>
             <textarea

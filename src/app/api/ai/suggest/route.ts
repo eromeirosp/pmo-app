@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import prisma from "@/lib/prisma";
 import { sanitizeForPrompt } from "@/lib/ai-sanitize";
 import { SUGGEST_SCHEMAS } from "@/lib/ai-schemas";
+import { getProjectContext } from "@/lib/ai-context";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ Retorne um JSON com as chaves: "accomplishments" (conquistas do período), "next
 Cada campo deve ter 2-3 frases profissionais e específicas ao projeto.`,
 
   risk_suggest: `Com base no contexto do projeto abaixo e nos riscos já identificados, sugira de 2 a 3 NOVOS riscos que ainda não foram catalogados.
-Para cada risco, inclua: title, description, probability (1-5), impact (1-5), category, mitigation (estratégia de mitigação).
+Para cada risco, inclua: title, description, probability (1-5), impact (1-5), category, mitigation (estratégia de mitigação), contingency (plano de contingência).
 Categorias possíveis: Técnico, Organizacional, Externo, Gerenciamento de Projeto, Financeiro.`,
 
   classification: `Com base no contexto do projeto abaixo, analise e sugira a classificação metodológica mais adequada.
@@ -100,7 +101,7 @@ Extraia TODAS as informações relevantes que encontrar:
    - "issues": problemas ou impedimentos mencionados
    - "overallStatus": se a reunião indica mudança de status do projeto, sugira "Verde (Saudável)", "Amarelo (Atenção)" ou "Vermelho (Risco)"
    - "statusJustification": justificativa para a mudança de status sugerida
-3. "stakeholders": Nomes de pessoas mencionadas com papéis [{ "name", "role" }].
+3. "stakeholders": Nomes de pessoas mencionadas com papéis [{ "name", "role", "alreadyRegistered" }]. Se o stakeholder JÁ está na lista de cadastrados do projeto, marque "alreadyRegistered": true. Caso contrário, "alreadyRegistered": false.
 4. "eapItems": NOVAS tarefas, atividades ou entregas identificadas [{ "name", "description" }].
 5. "eapUpdates": Tarefas EXISTENTES que mudaram de status na reunião [{ "name" (nome exato ou aproximado do item EAP), "newStatus" ("PENDING" | "IN_PROGRESS" | "DONE"), "reason" (por que mudou) }]. Compare com os itens da EAP do contexto do projeto.
 6. "risks": Riscos, problemas potenciais ou preocupações [{ "title", "description", "probability" (1-5), "impact" (1-5), "category" }].
@@ -108,73 +109,6 @@ Extraia TODAS as informações relevantes que encontrar:
 
 Seja inteligente: extraia apenas o que faz sentido. Se a transcrição não menciona riscos, retorne array vazio para risks. Idem para outros campos. Mas seja AGRESSIVO em identificar decisões — qualquer "ficou decidido que", "vamos fazer X", "combinamos que" é uma decisão.`,
 };
-
-async function getProjectContext(projectId: string, enriched = false) {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    include: {
-      risks: true,
-      charterItems: true,
-      artifacts: true,
-      eapItems: true,
-      closingItems: enriched ? true : undefined,
-      statusReports: enriched
-        ? { orderBy: { reportDate: "desc" } }
-        : { orderBy: { reportDate: "desc" }, take: 3 },
-    },
-  });
-
-  if (!project) return null;
-
-  const businessCase = project.artifacts.find(
-    (a) => a.type === "BUSINESS_CASE"
-  );
-  const scope = project.artifacts.find(
-    (a) => a.type === "ESCOPO_PRELIMINAR"
-  );
-
-  // Sanitizar dados do projeto antes de incluir no prompt
-  let contextText = `
-Nome: ${sanitizeForPrompt(project.name, 500)}
-Gerente: ${sanitizeForPrompt(project.manager, 500)}
-Orçamento: R$ ${project.budget.toLocaleString("pt-BR")}
-Classificação: ${project.classification || "Não definida"}
-Problemas: ${sanitizeForPrompt(project.problems)}
-Retornos esperados: ${sanitizeForPrompt(project.returns)}
-Impactos: ${sanitizeForPrompt(project.impacts)}
-Business Case: ${businessCase ? JSON.stringify(businessCase.content) : "Não gerado"}
-Escopo Preliminar: ${scope ? JSON.stringify(scope.content) : "Não gerado"}
-Riscos existentes: ${project.risks.map((r) => `${sanitizeForPrompt(r.title || r.description, 200)} (P:${r.probability} I:${r.impact})`).join("; ") || "Nenhum"}
-Itens do Charter: ${project.charterItems.map((c) => `[${c.type}] ${sanitizeForPrompt(c.text, 300)}`).join("; ") || "Nenhum"}
-Últimos Status Reports: ${project.statusReports.map((s) => `${s.period}: ${s.overallStatus} (${s.progress}%)`).join("; ") || "Nenhum"}
-  `.trim();
-
-  // Contexto adicional para EAP e Encerramento
-  if (project.eapItems && project.eapItems.length > 0) {
-    contextText += `\nEAP atual: ${project.eapItems.map((e) => `${sanitizeForPrompt(e.name, 200)} [${e.status}]${e.parentId ? ` (filho de ${project.eapItems.find(p => p.id === e.parentId)?.name || e.parentId})` : ""}`).join("; ")}`;
-  }
-
-  if (enriched && project.statusReports.length > 0) {
-    contextText += `\n\nHistórico completo de Status Reports:`;
-    for (const sr of project.statusReports) {
-      contextText += `\n- ${sr.period}: Status ${sr.overallStatus}, Progresso ${sr.progress}%, Escopo: ${sr.scopeStatus}, Cronograma: ${sr.scheduleStatus}, Orçamento: ${sr.budgetStatus}`;
-      if (sr.accomplishments) contextText += ` | Conquistas: ${sanitizeForPrompt(sr.accomplishments, 500)}`;
-      if (sr.issues) contextText += ` | Problemas: ${sanitizeForPrompt(sr.issues, 500)}`;
-    }
-  }
-
-  if (enriched && "closingItems" in project) {
-    const closingItems = project.closingItems as Array<{ type: string; text: string }>;
-    if (closingItems.length > 0) {
-      contextText += `\nItens de encerramento já existentes: ${closingItems.map((c) => `[${c.type}] ${sanitizeForPrompt(c.text, 300)}`).join("; ")}`;
-    }
-  }
-
-  return {
-    project,
-    contextText,
-  };
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -235,6 +169,15 @@ export async function POST(req: NextRequest) {
     let transcriptSection = "";
     if (isMeetingTranscript && transcript) {
       transcriptSection = `\n\nTranscrição da Reunião:\n${sanitizeForPrompt(transcript, 10000)}`;
+
+      // Fetch existing stakeholders to avoid duplicates
+      const existingStakeholders = await prisma.stakeholder.findMany({
+        where: { projectId },
+        select: { name: true, role: true },
+      });
+      if (existingStakeholders.length > 0) {
+        transcriptSection += `\n\nSTAKEHOLDERS JÁ CADASTRADOS NESTE PROJETO (não sugira como novos — marque alreadyRegistered: true):\n${existingStakeholders.map((s) => `- ${s.name}${s.role ? ` (${s.role})` : ""}`).join("\n")}`;
+      }
     }
 
     const prompt = `Você atua como um PMO Master especialista em gestão de projetos corporativos.

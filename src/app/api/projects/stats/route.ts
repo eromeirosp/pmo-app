@@ -11,6 +11,7 @@ export async function GET() {
         classification: true,
         budget: true,
         expectedReturn: true,
+        currency: true,
         manager: true,
         department: true,
         createdAt: true,
@@ -35,7 +36,15 @@ export async function GET() {
         )
       : 0;
 
-    // Budget metrics
+    // Budget metrics — grouped by currency
+    const budgetByCurrency: Record<string, { total: number; count: number }> = {};
+    for (const p of projects) {
+      const cur = p.currency || "BRL";
+      if (!budgetByCurrency[cur]) budgetByCurrency[cur] = { total: 0, count: 0 };
+      budgetByCurrency[cur].total += p.budget ?? 0;
+      budgetByCurrency[cur].count += 1;
+    }
+    // Legacy totals (sum all currencies — backward compat)
     const totalBudget = projects.reduce((sum, p) => sum + (p.budget ?? 0), 0);
     const avgBudget = projects.length > 0 ? totalBudget / projects.length : 0;
 
@@ -48,6 +57,7 @@ export async function GET() {
           p.name.length > 22 ? p.name.substring(0, 22) + "…" : p.name,
         budget: p.budget ?? 0,
         status: p.status,
+        currency: p.currency || "BRL",
       }));
 
     // Projects per month — last 6 months
@@ -109,6 +119,7 @@ export async function GET() {
       healthScore,
       totalBudget,
       avgBudget,
+      budgetByCurrency,
       topByBudget,
       projectsPerMonth,
       avgROI: avgROI !== null ? Math.round(avgROI) : null,

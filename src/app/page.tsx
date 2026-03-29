@@ -7,7 +7,9 @@ import { Project } from "@prisma/client";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
-import { Search, Filter, X, BarChart2 } from "lucide-react";
+import { Search, Filter, X, BarChart2, Download } from "lucide-react";
+import { toast } from "sonner";
+import { createPdfDoc, addTable, addNarrativeSection, savePdf } from "@/lib/pdf-utils";
 import {
   Select,
   SelectContent,
@@ -22,6 +24,7 @@ import { ProjectsAreaChart } from "@/components/dashboard/ProjectsAreaChart";
 import { StatusLegend } from "@/components/ui/status-legend";
 import { PortfolioAssistant } from "@/components/dashboard/PortfolioAssistant";
 import { WeeklyDigestCard } from "@/components/dashboard/WeeklyDigestCard";
+import { PredictiveAlertsCard } from "@/components/intelligence/PredictiveAlertsCard";
 
 interface StatsData {
   total: number;
@@ -29,7 +32,8 @@ interface StatsData {
   classificationCounts: { TRADITIONAL: number; AGILE: number; HYBRID: number };
   totalBudget: number;
   avgBudget: number;
-  topByBudget: { name: string; budget: number; status: string }[];
+  budgetByCurrency?: Record<string, { total: number; count: number }>;
+  topByBudget: { name: string; budget: number; status: string; currency?: string }[];
   projectsPerMonth: { month: string; projetos: number }[];
   avgROI: number | null;
   topByROI: { name: string; roi: number; budget: number; status: string }[];
@@ -63,6 +67,7 @@ export default function Home() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [healthData, setHealthData] = useState<Record<string, { score: number; trend: string; alertCount: number }>>({});
 
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterDate, setFilterDate] = useState("all");
@@ -71,7 +76,44 @@ export default function Home() {
   useEffect(() => {
     fetchProjects();
     fetchStats();
+    fetchHealthData();
   }, []);
+
+  const fetchHealthData = async () => {
+    try {
+      const [alertsRes] = await Promise.all([
+        fetch("/api/intelligence/alerts"),
+      ]);
+      if (alertsRes.ok) {
+        const alerts = await alertsRes.json();
+        // Group alerts by project and build health summary
+        const byProject: Record<string, { alertCount: number; maxSeverity: string }> = {};
+        for (const alert of alerts) {
+          if (!byProject[alert.projectId]) {
+            byProject[alert.projectId] = { alertCount: 0, maxSeverity: "LOW" };
+          }
+          byProject[alert.projectId].alertCount++;
+        }
+        // Estimate health score from alerts (simplified: 100 - deductions)
+        const deductions: Record<string, number> = { CRITICAL: 25, HIGH: 15, MEDIUM: 8, LOW: 3 };
+        const data: Record<string, { score: number; trend: string; alertCount: number }> = {};
+        for (const alert of alerts) {
+          if (!data[alert.projectId]) {
+            data[alert.projectId] = { score: 100, trend: "stable", alertCount: 0 };
+          }
+          data[alert.projectId].score -= deductions[alert.severity] || 0;
+          data[alert.projectId].alertCount++;
+        }
+        // Clamp scores
+        for (const key of Object.keys(data)) {
+          data[key].score = Math.max(0, data[key].score);
+        }
+        setHealthData(data);
+      }
+    } catch {
+      // Health data is optional, don't block dashboard
+    }
+  };
 
   const fetchProjects = async (search = "") => {
     setLoading(true);
@@ -104,6 +146,62 @@ export default function Home() {
       setStats(null);
     } finally {
       setStatsLoading(false);
+    }
+  };
+
+  const handleExportPortfolio = async () => {
+    if (!stats || projects.length === 0) {
+      toast.error("Nenhum dado para exportar.");
+      return;
+    }
+    try {
+      const formatCurrency = (v: number) =>
+        new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+
+      const { doc, startY } = createPdfDoc({
+        title: "Relatório do Portfólio de Projetos",
+        subtitle: "PMO — AIR Company",
+        meta: [
+          `Total de Projetos: ${stats.total}`,
+          `Orçamento Total: ${formatCurrency(stats.totalBudget)}`,
+          `Orçamento Médio: ${formatCurrency(stats.avgBudget)}`,
+        ],
+      });
+
+      // Status distribution
+      let y = addTable(doc, startY,
+        [["Status", "Quantidade", "Percentual"]],
+        [
+          ["No Prazo (Verde)", String(stats.statusCounts.GREEN), `${stats.total > 0 ? Math.round((stats.statusCounts.GREEN / stats.total) * 100) : 0}%`],
+          ["Atenção (Amarelo)", String(stats.statusCounts.YELLOW), `${stats.total > 0 ? Math.round((stats.statusCounts.YELLOW / stats.total) * 100) : 0}%`],
+          ["Atrasado (Vermelho)", String(stats.statusCounts.RED), `${stats.total > 0 ? Math.round((stats.statusCounts.RED / stats.total) * 100) : 0}%`],
+        ],
+      );
+
+      // Projects list
+      const projectData = projects
+        .sort((a, b) => b.budget - a.budget)
+        .map((p) => [
+          p.name,
+          p.manager,
+          p.status === "GREEN" ? "Verde" : p.status === "YELLOW" ? "Amarelo" : "Vermelho",
+          formatCurrency(p.budget),
+          p.department || "—",
+        ]);
+
+      y = addNarrativeSection(doc, y, "Lista de Projetos", "");
+      y -= 5;
+      addTable(doc, y,
+        [["Projeto", "Gerente", "Status", "Orçamento", "Departamento"]],
+        projectData,
+        { columnStyles: { 0: { cellWidth: 40 } } }
+      );
+
+      await savePdf(doc, `Relatorio_Portfolio_${new Date().toISOString().slice(0, 10)}.pdf`);
+      toast.success("Relatório do portfólio exportado!");
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      toast.error("Erro ao gerar PDF.");
     }
   };
 
@@ -191,9 +289,17 @@ export default function Home() {
             red={stats.statusCounts.RED}
             totalBudget={stats.totalBudget}
             avgBudget={stats.avgBudget}
+            budgetByCurrency={stats.budgetByCurrency}
             avgROI={stats.avgROI}
           />
         ) : null}
+
+        {/* Predictive Alerts */}
+        {!statsLoading && stats && stats.total > 0 && (
+          <PredictiveAlertsCard
+            projectNames={Object.fromEntries(projects.map((p) => [p.id, p.name]))}
+          />
+        )}
 
         {/* Status Legend */}
         {!statsLoading && stats && stats.total > 0 && (
@@ -277,6 +383,15 @@ export default function Home() {
               </SelectContent>
             </Select>
           </div>
+
+          <button
+            onClick={handleExportPortfolio}
+            disabled={!stats || projects.length === 0}
+            className="flex items-center gap-2 h-10 px-4 rounded-xl bg-background/50 border border-border text-muted-foreground font-bold text-xs hover:bg-background/80 hover:border-primary/30 hover:text-foreground transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            <Download className="w-4 h-4" />
+            Exportar PDF
+          </button>
         </div>
 
         <div className="flex justify-between items-center mb-5">
@@ -329,7 +444,12 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: index * 0.04 }}
               >
-                <ProjectCard project={project} />
+                <ProjectCard
+                  project={project}
+                  healthScore={healthData[project.id]?.score ?? null}
+                  healthTrend={healthData[project.id]?.trend as "improving" | "stable" | "declining" | undefined}
+                  alertCount={healthData[project.id]?.alertCount}
+                />
               </motion.div>
             ))}
           </div>
