@@ -424,8 +424,8 @@ function ComparisonModal({
                 Radar Comparativo (simulados)
               </p>
               <ScenarioRadar
-                current={(radarA as SimulationResult).simulatedRadar || (radarA as { current: RadarDimensions }).current}
-                simulated={(radarB as SimulationResult).simulatedRadar || (radarB as { simulated: RadarDimensions }).simulated}
+                current={(radarA as SimulationResult).simulatedRadar || (radarA as unknown as { current: RadarDimensions }).current}
+                simulated={(radarB as SimulationResult).simulatedRadar || (radarB as unknown as { simulated: RadarDimensions }).simulated}
                 comparisonLabel={scenarioA.label}
               />
             </div>
