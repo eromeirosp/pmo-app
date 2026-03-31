@@ -105,6 +105,11 @@ export function ProjectInfoTab({ project, saveTrigger }: ProjectInfoTabProps) {
       if (!res.ok) throw new Error();
       const data = await res.json();
       setCadenceData(data);
+      await fetch(`/api/projects/${project.id}/artifacts/upsert`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "CADENCE_RITUALS", content: data }),
+      });
       toast.success("Cadência atualizada pela IA.");
     } catch {
       toast.error("Erro ao obter sugestão de cadência.");

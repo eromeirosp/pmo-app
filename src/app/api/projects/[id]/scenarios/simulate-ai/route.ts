@@ -107,7 +107,7 @@ Seja direto, profissional e use linguagem de negócio. Não repita os dados que 
             const response = await ai.models.generateContentStream({
               model: 'gemini-2.5-pro',
               contents: prompt,
-              config: { maxOutputTokens: 4096 },
+              config: { maxOutputTokens: 8192 },
             })
             for await (const chunk of response) {
               const text = chunk.text || ''
@@ -122,7 +122,7 @@ Seja direto, profissional e use linguagem de negócio. Não repita os dados que 
             const response = await ai.models.generateContentStream({
               model,
               contents: prompt,
-              config: { maxOutputTokens: 4096 },
+              config: { maxOutputTokens: 8192 },
             })
             for await (const chunk of response) {
               const text = chunk.text || ''
