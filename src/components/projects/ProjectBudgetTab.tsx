@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Wallet, Plus, Trash2, Loader2, TrendingUp, TrendingDown, DollarSign, PieChart } from "lucide-react";
+import { Wallet, Plus, Trash2, Loader2, TrendingUp, TrendingDown, DollarSign, PieChart, Download } from "lucide-react";
+import { createPdfDoc, addTable, addNarrativeSection, savePdf } from "@/lib/pdf-utils";
+import { formatCurrency as formatCurrencyUtil, getCurrencySymbol } from "@/lib/format";
 import { TabHeader } from "./TabHeader";
 import { toast } from "sonner";
 import {
@@ -34,15 +36,13 @@ interface BudgetSummary {
   byCategory: Record<string, number>;
 }
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-
 const formatDate = (dateStr: string) =>
   new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(dateStr));
 
 const CATEGORIES = ["Pessoal", "Infraestrutura", "Licenças", "Serviços", "Outros"];
 
-export default function ProjectBudgetTab({ projectId, totalBudget }: { projectId: string; totalBudget: number }) {
+export default function ProjectBudgetTab({ projectId, totalBudget, currency = "BRL" }: { projectId: string; totalBudget: number; currency?: string }) {
+  const formatCurrency = (value: number) => formatCurrencyUtil(value, currency);
   const [entries, setEntries] = useState<BudgetEntry[]>([]);
   const [summary, setSummary] = useState<BudgetSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,6 +124,55 @@ export default function ProjectBudgetTab({ projectId, totalBudget }: { projectId
     }
   };
 
+  const handleExport = async () => {
+    if (entries.length === 0 && !summary) {
+      toast.error("Nenhum dado para exportar.");
+      return;
+    }
+    try {
+      const { doc, startY } = createPdfDoc({
+        title: "Controle de Orçamento",
+        projectId,
+        meta: [
+          `Orçamento Aprovado: ${formatCurrency(totalBudget)}`,
+          ...(summary ? [
+            `Total Gasto: ${formatCurrency(summary.totalSpent)}`,
+            `Restante: ${formatCurrency(summary.remaining)}`,
+            `Burn Rate: ${Math.round(summary.burnRate * 100)}%`,
+          ] : []),
+        ],
+      });
+
+      const tableData = entries.map((e) => [
+        e.description,
+        e.type === "EXPENSE" ? "Despesa" : "Ajuste",
+        e.category || "—",
+        formatCurrency(e.amount),
+        new Date(e.date).toLocaleDateString("pt-BR"),
+      ]);
+
+      let y = addTable(doc, startY,
+        [["Descrição", "Tipo", "Categoria", "Valor", "Data"]],
+        tableData,
+      );
+
+      if (summary && Object.keys(summary.byCategory).length > 0) {
+        y = addNarrativeSection(doc, y, "Resumo por Categoria", "");
+        y -= 5;
+        const catData = Object.entries(summary.byCategory)
+          .sort(([, a], [, b]) => b - a)
+          .map(([cat, val]) => [cat, formatCurrency(val), `${summary.totalSpent > 0 ? Math.round((val / summary.totalSpent) * 100) : 0}%`]);
+        addTable(doc, y, [["Categoria", "Valor", "% do Total"]], catData);
+      }
+
+      await savePdf(doc, `Orcamento_Projeto_${projectId}.pdf`);
+      toast.success("PDF gerado com sucesso!");
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      toast.error("Erro ao gerar PDF.");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center py-20">
@@ -147,13 +196,22 @@ export default function ProjectBudgetTab({ projectId, totalBudget }: { projectId
           title="Controle de Orçamento"
           description="Gerencie lançamentos e acompanhe a saúde financeira do projeto"
           actions={
-            <button
-              onClick={() => setShowForm(!showForm)}
-              className="flex items-center gap-2 rounded-xl h-10 px-4 bg-primary text-white font-medium text-sm shadow-sm hover:shadow-md hover:bg-primary/90 transition-all duration-200 active:scale-[0.98]"
-            >
-              <Plus className="w-5 h-5" />
-              Novo Lançamento
-            </button>
+            <>
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-2 rounded-xl h-10 px-4 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 font-medium text-sm transition-all duration-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-white/20 active:scale-[0.98] cursor-pointer"
+              >
+                <Download className="w-5 h-5" />
+                Exportar PDF
+              </button>
+              <button
+                onClick={() => setShowForm(!showForm)}
+                className="flex items-center gap-2 rounded-xl h-10 px-4 bg-primary text-white font-medium text-sm shadow-sm hover:shadow-md hover:bg-primary/90 transition-all duration-200 active:scale-[0.98]"
+              >
+                <Plus className="w-5 h-5" />
+                Novo Lançamento
+              </button>
+            </>
           }
         />
       </div>

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Project } from "@prisma/client";
-import { AlertTriangle, PlusCircle, Plus, Trash2, Loader2, AlertCircle, Pencil, Sparkles, X, ShieldCheck } from "lucide-react";
+import { AlertTriangle, PlusCircle, Plus, Trash2, Loader2, AlertCircle, Pencil, Sparkles, X, ShieldCheck, Download } from "lucide-react";
+import { createPdfDoc, addTable, savePdf } from "@/lib/pdf-utils";
 import { motion } from "framer-motion";
 import { TabHeader } from "./TabHeader";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -211,40 +212,50 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
     const p = form.probability;
     const i = form.impact;
     const level = calculateLevel(p, i);
-    const res = await fetch(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: form.title,
-        description: form.description || form.title,
+    try {
+      const res = await fetch(baseUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description || form.title,
+          level,
+          category: form.category || "Geral",
+          responsible: form.responsible,
+          mitigation: form.mitigation,
+          contingency: form.contingency,
+          status: form.status,
+          probability: p,
+          impact: i,
+        }),
+      });
+      if (!res.ok) {
+        toast.error("Erro ao criar risco");
+        return;
+      }
+      const created = await res.json();
+      const newRisk: RiskItem = {
+        id: created.id,
         level,
-        category: form.category || "Geral",
-        responsible: form.responsible,
-        mitigation: form.mitigation,
-        contingency: form.contingency,
-        status: form.status,
+        levelColor: LEVEL_COLORS[level] || LEVEL_COLORS["Médio"],
+        title: created.title,
+        status: created.status,
         probability: p,
         impact: i,
-      }),
-    });
-    const created = await res.json();
-    const newRisk: RiskItem = {
-      id: created.id,
-      level,
-      levelColor: LEVEL_COLORS[level] || LEVEL_COLORS["Médio"],
-      title: created.title,
-      status: created.status,
-      probability: p,
-      impact: i,
-      score: p * i,
-      category: created.category,
-      responsible: created.responsible || "—",
-      mitigation: created.mitigation || "—",
-      contingency: created.contingency || "—",
-    };
-    setRisks((prev) => [...prev, newRisk]);
-    setForm({ title: "", category: "", description: "", probability: 3, impact: 3, status: "Em Monitoramento", responsible: "", mitigation: "", contingency: "" });
-    setSaving(false);
+        score: p * i,
+        category: created.category,
+        responsible: created.responsible || "—",
+        mitigation: created.mitigation || "—",
+        contingency: created.contingency || "—",
+      };
+      setRisks((prev) => [...prev, newRisk]);
+      setForm({ title: "", category: "", description: "", probability: 3, impact: 3, status: "Em Monitoramento", responsible: "", mitigation: "", contingency: "" });
+      toast.success("Risco criado com sucesso");
+    } catch {
+      toast.error("Erro ao criar risco");
+    } finally {
+      setSaving(false);
+    }
   }, [baseUrl, form]);
 
   const handleDelete = useCallback(async (id: string) => {
@@ -349,41 +360,89 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
     const p = suggestion.probability;
     const i = suggestion.impact;
     const level = calculateLevel(p, i);
-    const res = await fetch(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: suggestion.title,
-        description: suggestion.description,
+    try {
+      const res = await fetch(baseUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: suggestion.title,
+          description: suggestion.description,
+          level,
+          category: suggestion.category || "Geral",
+          mitigation: suggestion.mitigation,
+          contingency: suggestion.contingency || "",
+          status: "Identificado",
+          probability: p,
+          impact: i,
+        }),
+      });
+      if (!res.ok) {
+        toast.error("Erro ao adicionar risco sugerido");
+        return;
+      }
+      const created = await res.json();
+      setRisks((prev) => [...prev, {
+        id: created.id,
         level,
-        category: suggestion.category || "Geral",
-        mitigation: suggestion.mitigation,
-        contingency: suggestion.contingency || "",
-        status: "Identificado",
+        levelColor: LEVEL_COLORS[level] || LEVEL_COLORS["Médio"],
+        title: created.title,
+        status: created.status,
         probability: p,
         impact: i,
-      }),
-    });
-    const created = await res.json();
-    setRisks((prev) => [...prev, {
-      id: created.id,
-      level,
-      levelColor: LEVEL_COLORS[level] || LEVEL_COLORS["Médio"],
-      title: created.title,
-      status: created.status,
-      probability: p,
-      impact: i,
-      score: p * i,
-      category: created.category || "Geral",
-      responsible: created.responsible || "—",
-      mitigation: created.mitigation || "—",
-      contingency: created.contingency || "—",
-    }]);
-    toast.success("Risco adicionado!");
+        score: p * i,
+        category: created.category || "Geral",
+        responsible: created.responsible || "—",
+        mitigation: created.mitigation || "—",
+        contingency: created.contingency || "—",
+      }]);
+      toast.success("Risco adicionado!");
+    } catch {
+      toast.error("Erro ao adicionar risco sugerido");
+    }
   };
 
   const handleDismissSuggestion = (suggestion: typeof suggestedRisks[0]) => {
     setSuggestedRisks((prev) => prev.filter((s) => s !== suggestion));
+  };
+
+  const handleExport = async () => {
+    if (risks.length === 0) {
+      toast.error("Nenhum risco para exportar.");
+      return;
+    }
+    try {
+      const { doc, startY } = createPdfDoc({
+        title: "Matriz de Riscos",
+        projectName: project.name,
+        projectId: project.id,
+        meta: [`Total de riscos: ${risks.length}`],
+      });
+
+      const tableData = risks
+        .sort((a, b) => b.score - a.score)
+        .map((r) => [
+          r.title,
+          `${r.probability}×${r.impact}=${r.score}`,
+          r.level,
+          r.status,
+          r.category,
+          r.responsible,
+          r.mitigation,
+          r.contingency,
+        ]);
+
+      addTable(doc, startY,
+        [["Risco", "P×I", "Nível", "Status", "Categoria", "Responsável", "Mitigação", "Contingência"]],
+        tableData,
+        { columnStyles: { 0: { cellWidth: 30 }, 6: { cellWidth: 30 }, 7: { cellWidth: 30 } } }
+      );
+
+      await savePdf(doc, `Riscos_Projeto_${project.id}.pdf`);
+      toast.success("PDF gerado com sucesso!");
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      toast.error("Erro ao gerar PDF.");
+    }
   };
 
   const LEVEL_ORDER: Record<string, number> = {
@@ -415,14 +474,23 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
           title="Matriz de Riscos"
           description="Identificação, avaliação e mitigação de riscos estruturais do projeto."
           actions={
-            <button
-              onClick={handleAiSuggest}
-              disabled={aiSuggesting}
-              className="flex items-center gap-2 rounded-xl h-10 px-4 bg-primary/10 text-primary font-medium text-sm hover:bg-primary/20 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
-            >
-              {aiSuggesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              Sugerir Riscos com IA
-            </button>
+            <>
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-2 rounded-xl h-10 px-4 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 font-medium text-sm transition-all duration-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-white/20 active:scale-[0.98] cursor-pointer"
+              >
+                <Download className="w-5 h-5" />
+                Exportar PDF
+              </button>
+              <button
+                onClick={handleAiSuggest}
+                disabled={aiSuggesting}
+                className="flex items-center gap-2 rounded-xl h-10 px-4 bg-primary/10 text-primary font-medium text-sm hover:bg-primary/20 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
+              >
+                {aiSuggesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Sugerir Riscos com IA
+              </button>
+            </>
           }
         />
       </div>
@@ -459,6 +527,9 @@ export function ProjectRiskTab({ project }: ProjectRiskTabProps) {
                 </div>
                 {s.mitigation && (
                   <p className="text-xs text-slate-500"><span className="font-semibold">Mitigação:</span> {s.mitigation}</p>
+                )}
+                {s.contingency && (
+                  <p className="text-xs text-slate-500"><span className="font-semibold">Contingência:</span> {s.contingency}</p>
                 )}
                 <button
                   onClick={() => handleAcceptSuggestion(s)}

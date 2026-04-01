@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from 'react';
 import { parseLocalDate } from "@/lib/utils";
+import { formatCurrency as formatCurrencyUtil, getCurrencySymbol } from "@/lib/format";
 import {
   Download,
   Plus,
@@ -97,7 +98,8 @@ const iconForIndicator = (label: string) => {
   return Wallet;
 };
 
-export default function ProjectStatusReportTab({ projectId }: { projectId: string }) {
+export default function ProjectStatusReportTab({ projectId, currency = "BRL" }: { projectId: string; currency?: string }) {
+  const formatCurrency = (value: number) => formatCurrencyUtil(value, currency);
   const [reports, setReports] = useState<StatusReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -237,7 +239,7 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
         report.period,
         report.overallStatus,
         report.progress + "%",
-        new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(report.budgetSpent || 0),
+        formatCurrency(report.budgetSpent || 0),
         report.reportDate ? parseLocalDate(report.reportDate).toLocaleDateString('pt-BR') : "—"
       ]);
 
@@ -405,7 +407,7 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
                     </h4>
                     <div className="flex items-end gap-2 mb-1">
                       <span className="text-2xl font-bold">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(latest.budgetSpent)}
+                        {formatCurrency(latest.budgetSpent)}
                       </span>
                     </div>
                   </div>
@@ -510,7 +512,7 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
                 <div className="flex items-center gap-4 text-sm">
                   <span className="text-slate-500">Progresso: <strong className="text-primary">{report.progress}%</strong></span>
                   {report.budgetSpent !== null && (
-                    <span className="text-slate-500">Gasto: <strong>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(report.budgetSpent)}</strong></span>
+                    <span className="text-slate-500">Gasto: <strong>{formatCurrency(report.budgetSpent)}</strong></span>
                   )}
                 </div>
                 {report.accomplishments && <div><h4 className="text-xs font-bold uppercase text-emerald-600 mb-1">Realizações</h4><p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-line">{report.accomplishments}</p></div>}
@@ -619,9 +621,9 @@ export default function ProjectStatusReportTab({ projectId }: { projectId: strin
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Orçamento Gasto (R$)</label>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Orçamento Gasto ({getCurrencySymbol(currency)})</label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">R$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{getCurrencySymbol(currency)}</span>
                   <input
                     className={`${inputClasses} pl-11`}
                     placeholder="0,00"

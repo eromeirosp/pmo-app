@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Newspaper, RefreshCw, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface DigestData {
   id: string;
@@ -40,7 +41,7 @@ export function WeeklyDigestCard() {
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const res = await fetch("/api/cron?digest=true");
+      const res = await fetch("/api/cron?digest=true&force=true");
       if (!res.ok) throw new Error();
       const data = await res.json();
       if (data.digestCreated) {
@@ -140,7 +141,7 @@ export function WeeklyDigestCard() {
       {expanded && (
         <div className="px-5 pb-5 border-t border-border/50 pt-4">
           <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-            <ReactMarkdown>{digest.message}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{digest.message}</ReactMarkdown>
           </div>
         </div>
       )}

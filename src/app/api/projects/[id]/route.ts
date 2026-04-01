@@ -113,11 +113,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             ...(data.expectedReturn !== undefined && {
                 expectedReturn: data.expectedReturn ? parseFloat(String(data.expectedReturn).replace(/[^\d.]/g, '')) : null,
             }),
+            ...(data.currency !== undefined && { currency: data.currency }),
         };
 
         if (typeof data.charterApproved === "boolean") {
             updateData.charterApproved = data.charterApproved;
             updateData.charterApprovedAt = data.charterApproved ? new Date() : null;
+        }
+
+        if (typeof data.closingApproved === "boolean") {
+            updateData.closingApproved = data.closingApproved;
+            updateData.closingApprovedAt = data.closingApproved ? new Date() : null;
+            if (!data.closingApproved && data.closingReopenReason) {
+                updateData.closingReopenReason = data.closingReopenReason;
+            }
         }
 
         // Status override: allow setting or clearing
@@ -133,7 +142,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
         // Audit log for changed fields (batch)
         const auditEntries: Parameters<typeof recordAuditLogBatch>[0] = [];
-        const auditFields = ["name", "status", "classification", "manager", "department", "charterApproved", "statusOverride", "statusOverrideReason"] as const;
+        const auditFields = ["name", "status", "classification", "manager", "department", "charterApproved", "closingApproved", "currency", "statusOverride", "statusOverrideReason"] as const;
         for (const field of auditFields) {
             const oldVal = String(currentProject[field] ?? "");
             const newVal = String(updatedProject[field] ?? "");
@@ -146,6 +155,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         }
         if (currentProject.expectedReturn !== updatedProject.expectedReturn) {
             auditEntries.push({ projectId: id, action: "UPDATE", entity: "Project", entityId: id, field: "expectedReturn", oldValue: String(currentProject.expectedReturn ?? ""), newValue: String(updatedProject.expectedReturn ?? "") });
+        }
+        // Explicit audit entry for reopen reason (bypasses field comparison issues with hot-reload)
+        if (data.closingReopenReason && typeof data.closingApproved === "boolean" && !data.closingApproved) {
+            auditEntries.push({ projectId: id, action: "UPDATE", entity: "Project", entityId: id, field: "closingReopenReason", oldValue: "", newValue: data.closingReopenReason });
         }
         await recordAuditLogBatch(auditEntries);
 

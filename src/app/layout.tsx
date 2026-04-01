@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { FeedbackWidget } from '@/components/feedback/FeedbackWidget';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -26,9 +27,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <main className="min-h-screen bg-background text-foreground transition-colors duration-300">
-            {children}
-          </main>
+          <TooltipProvider delayDuration={200}>
+            <main className="min-h-screen bg-background text-foreground transition-colors duration-300">
+              {children}
+            </main>
+          </TooltipProvider>
           <Toaster position="bottom-center" />
           <FeedbackWidget />
         </ThemeProvider>

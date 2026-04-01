@@ -1,6 +1,7 @@
 "use client";
 
 import { TrendingUp, TrendingDown, Minus, CheckCircle2, AlertTriangle, DollarSign, PieChart } from "lucide-react";
+import { formatCurrencyCompact, convertCurrency } from "@/lib/format";
 
 interface KPICardProps {
   title: string;
@@ -147,16 +148,8 @@ interface StatsKPIRowProps {
   red: number;
   totalBudget: number;
   avgBudget: number;
+  budgetByCurrency?: Record<string, { total: number; count: number }>;
   avgROI?: number | null;
-}
-
-function formatBRL(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(value);
 }
 
 export function StatsKPIRow({
@@ -166,9 +159,39 @@ export function StatsKPIRow({
   red,
   totalBudget,
   avgBudget,
+  budgetByCurrency,
   avgROI,
 }: StatsKPIRowProps) {
   const healthPct = total > 0 ? Math.round((green / total) * 100) : 0;
+
+  // Build multi-currency display
+  const currencies = budgetByCurrency ? Object.entries(budgetByCurrency).sort(([a], [b]) => {
+    // BRL first, then alphabetical
+    if (a === "BRL") return -1;
+    if (b === "BRL") return 1;
+    return a.localeCompare(b);
+  }) : [];
+  const primaryCurrency = currencies.length > 0 ? currencies[0] : null;
+  const secondaryCurrencies = currencies.slice(1);
+
+  const hasMultipleCurrencies = currencies.length > 1;
+
+  // When multiple currencies exist, show total converted to BRL
+  const totalConvertedBRL = hasMultipleCurrencies
+    ? currencies.reduce((sum, [code, data]) => sum + convertCurrency(data.total, code, "BRL"), 0)
+    : 0;
+
+  const budgetValue = hasMultipleCurrencies
+    ? formatCurrencyCompact(totalConvertedBRL, "BRL")
+    : primaryCurrency
+      ? formatCurrencyCompact(primaryCurrency[1].total, primaryCurrency[0])
+      : formatCurrencyCompact(totalBudget, "BRL");
+
+  const budgetSub = hasMultipleCurrencies
+    ? currencies.map(([code, data]) => formatCurrencyCompact(data.total, code)).join("  ·  ")
+    : primaryCurrency
+      ? `Média ${formatCurrencyCompact(primaryCurrency[1].total / primaryCurrency[1].count, primaryCurrency[0])}`
+      : `Média ${formatCurrencyCompact(avgBudget, "BRL")}`;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
@@ -188,8 +211,8 @@ export function StatsKPIRow({
       <AlertsKPICard yellow={yellow} red={red} total={total} />
       <KPICard
         title="Orçamento Total"
-        value={formatBRL(totalBudget)}
-        sub={`Média ${formatBRL(avgBudget)}`}
+        value={budgetValue}
+        sub={budgetSub}
         icon={<DollarSign size={20} />}
       />
       <KPICard

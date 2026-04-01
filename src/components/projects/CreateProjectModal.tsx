@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Info, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { getCurrencySymbol } from "@/lib/format";
 
 interface CreateProjectModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
     name: "",
     manager: "",
     budget: "",
+    currency: "BRL",
     stakeholders: "",
     problems: "",
     returns: "",
@@ -44,6 +46,7 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
       name: "",
       manager: "",
       budget: "",
+      currency: "BRL",
       stakeholders: "",
       problems: "",
       returns: "",
@@ -85,6 +88,7 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
 
       const finalProjectPayload = {
         ...formData,
+        currency: formData.currency,
         classification: aiResult.classification,
         businessCase: aiResult.businessCase,
         preliminaryScope: aiResult.preliminaryScope,
@@ -191,20 +195,31 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
                 </div>
                 <div>
                   <label className="block text-sm font-semibold mb-1.5 text-foreground">
-                    Orçamento (R$){" "}
+                    Orçamento{" "}
                     <span className="text-destructive">*</span>
                   </label>
-                  <input
-                    name="budget"
-                    value={formData.budget}
-                    onChange={handleChange}
-                    className={inputClass}
-                    placeholder="0,00"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                  />
+                  <div className="flex gap-2">
+                    <select
+                      value={formData.currency}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, currency: e.target.value }))}
+                      className={`${inputClass} w-24 shrink-0`}
+                    >
+                      <option value="BRL">BRL</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                    </select>
+                    <input
+                      name="budget"
+                      value={formData.budget}
+                      onChange={handleChange}
+                      className={inputClass}
+                      placeholder="0,00"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
 

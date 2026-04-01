@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
             expectedReturn,
             cadence,
             initialRisks,
+            currency,
         } = data;
 
         // Validate Anti-Error logic: High budget with empty scope description
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest) {
                 stakeholders,
                 classification,
                 expectedReturn: expectedReturn ? parseFloat(expectedReturn) : null,
+                currency: currency || "BRL",
                 problems,
                 returns,
                 impacts,
@@ -113,6 +115,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json(projects);
     } catch (err) {
+        console.error("Erro ao buscar projetos:", err);
         return NextResponse.json({ error: "Erro ao buscar projetos" }, { status: 500 });
     }
 }

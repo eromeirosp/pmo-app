@@ -13,6 +13,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { cn, parseLocalDate, calculateROI } from "@/lib/utils";
+import { getCurrencySymbol } from "@/lib/format";
 import { toast } from "sonner";
 import { TabHeader } from "./TabHeader";
 
@@ -55,6 +56,7 @@ interface ProjectInfoTabProps {
     status?: string | null;
     budget?: number | string | null;
     expectedReturn?: number | null;
+    currency?: string | null;
     startDate?: string | Date | null;
     endDate?: string | Date | null;
     computedStatus?: string | null;
@@ -74,6 +76,7 @@ export function ProjectInfoTab({ project, saveTrigger }: ProjectInfoTabProps) {
     status: project.status || "ACTIVE",
     budget: project.budget?.toString() || "",
     expectedReturn: project.expectedReturn?.toString() || "",
+    currency: project.currency || "BRL",
     startDate: project.startDate ? parseLocalDate(project.startDate).toISOString().split('T')[0] : "2025-10-01",
     endDate: project.endDate ? parseLocalDate(project.endDate).toISOString().split('T')[0] : "2026-06-30",
   });
@@ -102,6 +105,11 @@ export function ProjectInfoTab({ project, saveTrigger }: ProjectInfoTabProps) {
       if (!res.ok) throw new Error();
       const data = await res.json();
       setCadenceData(data);
+      await fetch(`/api/projects/${project.id}/artifacts/upsert`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "CADENCE_RITUALS", content: data }),
+      });
       toast.success("Cadência atualizada pela IA.");
     } catch {
       toast.error("Erro ao obter sugestão de cadência.");
@@ -351,23 +359,37 @@ export function ProjectInfoTab({ project, saveTrigger }: ProjectInfoTabProps) {
             </div>
           </InputWrapper>
 
-          <InputWrapper label="Orçamento (R$) *">
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">R$</span>
-              <input
-                type="text"
-                value={formData.budget}
-                onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
-                className={cn(inputClasses, "pl-10")}
-              />
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Orçamento *</label>
+            <div className="relative group">
+              <div className="flex gap-2">
+                <select
+                  value={formData.currency}
+                  onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                  className={cn(inputClasses, "w-24 shrink-0 appearance-none text-center")}
+                >
+                  <option value="BRL">BRL</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                </select>
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">{getCurrencySymbol(formData.currency)}</span>
+                  <input
+                    type="text"
+                    value={formData.budget}
+                    onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+                    className={cn(inputClasses, "pl-10")}
+                  />
+                </div>
+              </div>
             </div>
-          </InputWrapper>
+          </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Retorno Esperado (R$)</label>
+            <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Retorno Esperado ({getCurrencySymbol(formData.currency)})</label>
             <div className="relative group">
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">R$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">{getCurrencySymbol(formData.currency)}</span>
                 <input
                   type="text"
                   value={formData.expectedReturn}
@@ -413,13 +435,13 @@ export function ProjectInfoTab({ project, saveTrigger }: ProjectInfoTabProps) {
         </div>
       </form>
 
-      {/* Cadência e Rituais Recomendados */}
+      {/* Cadência e Eventos Recomendados */}
       <div className="mt-8 bg-card dark:bg-slate-900/80 border border-border dark:border-white/10 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:ring-1 dark:ring-white/5 overflow-hidden">
         <div className="p-8">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                Cadência e Rituais Recomendados
+                Cadência e Eventos Recomendados
               </h3>
               {cadenceData?.governanceSummary && (
                 <p className="text-sm text-muted-foreground italic mt-2 max-w-3xl">

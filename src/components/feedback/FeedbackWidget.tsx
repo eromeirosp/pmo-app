@@ -98,13 +98,17 @@ export function FeedbackWidget() {
         }),
       });
 
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        toast.error(body?.error || "Erro ao enviar feedback.");
+        return;
+      }
 
       toast.success("Feedback enviado com sucesso!");
       resetForm();
       setOpen(false);
     } catch {
-      toast.error("Erro ao enviar feedback.");
+      toast.error("Erro de conexão ao enviar feedback.");
     } finally {
       setLoading(false);
     }

@@ -152,6 +152,7 @@ export const MeetingTranscriptSchema = z.object({
     z.object({
       name: z.string().min(1),
       role: nullableStringDefault(""),
+      alreadyRegistered: z.boolean().optional().default(false),
     })
   ).nullable().optional().transform((v) => v ?? []),
   eapItems: z.array(
@@ -184,6 +185,12 @@ export const MeetingTranscriptSchema = z.object({
     })
   ).nullable().optional().transform((v) => v ?? []),
   summary: nullableStringDefault(""),
+});
+
+// --- Geração de Documentos ---
+
+export const DocumentGenerationSchema = z.object({
+  content: z.string().min(1),
 });
 
 // --- Mapa de schemas por tipo de sugestão ---

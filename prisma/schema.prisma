@@ -27,6 +27,10 @@ model Project {
   description      String?
   charterApproved    Boolean          @default(false)
   charterApprovedAt  DateTime?
+  closingApproved    Boolean          @default(false)
+  closingApprovedAt  DateTime?
+  closingReopenReason String?
+  currency             String           @default("BRL")
   statusOverride       String?
   statusOverrideReason String?
   expectedReturn   Float?
@@ -216,4 +220,119 @@ model AuditLog {
   oldValue  String?
   newValue  String?
   createdAt DateTime @default(now())
+}
+
+// ── Intelligence Engine ──────────────────────────────────
+
+enum IntelligenceCategory {
+  BUDGET
+  SCHEDULE
+  RISK
+  SCOPE
+  QUALITY
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model IntelligenceRule {
+  id               String               @id @default(uuid())
+  key              String               @unique
+  name             String
+  description      String
+  category         IntelligenceCategory
+  formula          String
+  defaultThreshold Float
+  enabled          Boolean              @default(true)
+  severity         AlertSeverity
+  isSystem         Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+}
+
+model ProjectRuleOverride {
+  id        String   @id @default(uuid())
+  projectId String
+  ruleKey   String
+  threshold Float?
+  enabled   Boolean?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, ruleKey])
+}
+
+model PredictiveAlert {
+  id         String        @id @default(uuid())
+  projectId  String
+  ruleKey    String
+  severity   AlertSeverity
+  title      String
+  message    String
+  evidence   Json
+  dismissed  Boolean       @default(false)
+  resolvedAt DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+model ProjectHealthSnapshot {
+  id             String   @id @default(uuid())
+  projectId      String
+  score          Int
+  triggeredRules Json
+  createdAt      DateTime @default(now())
+
+  @@index([projectId, createdAt])
+}
+
+// ── Autopilot + Simulador ────────────────────────────────
+
+enum AutopilotActionType {
+  STATUS_REPORT_DRAFT
+  RISK_ESCALATION
+  BUDGET_ALERT
+  SCHEDULE_ALERT
+  STAGNATION_NUDGE
+}
+
+enum AutopilotActionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+model AutopilotAction {
+  id              String                @id @default(uuid())
+  projectId       String
+  type            AutopilotActionType
+  status          AutopilotActionStatus @default(PENDING)
+  triggeredByRule String
+  draftData       Json
+  reviewedAt      DateTime?
+  reviewedBy      String?               @default("Usuário Sistema")
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([projectId, status])
+  @@index([projectId, type, status])
+}
+
+model Scenario {
+  id         String   @id @default(uuid())
+  projectId  String
+  label      String
+  parameters Json
+  result     Json
+  narrative  String?
+  radarData  Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([projectId])
 }
